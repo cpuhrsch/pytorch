@@ -1,6 +1,9 @@
 import torch
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
+from torch.autograd.function import Function
+from torch._thnn import type2backend
+from torch.autograd.function import once_differentiable
 
 from .module import Module
 from .. import functional as F
@@ -139,6 +142,8 @@ class EmbeddingBag(Module):
         scale_grad_by_freq (boolean, optional): if given, this will scale gradients by the frequency of
                                                 the words in the dictionary.
         mode (string, optional): 'sum' | 'mean'. Specifies the way to reduce the bag. Default: 'mean'
+        sparse (boolean, optional): if ``True``, gradient w.r.t. weight matrix will be a sparse tensor. See Notes for
+                                    more details regarding sparse gradients.
 
     Attributes:
         weight (Tensor): the learnable weights of the module of shape (num_embeddings, embedding_dim)
@@ -185,7 +190,7 @@ class EmbeddingBag(Module):
 
     def __init__(self, num_embeddings, embedding_dim,
                  max_norm=None, norm_type=2, scale_grad_by_freq=False,
-                 mode='mean'):
+                 mode='mean', sparse=False):
         super(EmbeddingBag, self).__init__()
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
@@ -194,6 +199,7 @@ class EmbeddingBag(Module):
         self.scale_grad_by_freq = scale_grad_by_freq
         self.weight = Parameter(torch.Tensor(num_embeddings, embedding_dim))
         self.mode = mode
+        self.sparse = sparse
 
         self.reset_parameters()
 
@@ -203,7 +209,7 @@ class EmbeddingBag(Module):
     def forward(self, input, offsets=None):
         return F.embedding_bag(self.weight, input, offsets,
                                self.max_norm, self.norm_type,
-                               self.scale_grad_by_freq, self.mode)
+                               self.scale_grad_by_freq, self.mode, self.sparse)
 
     def __repr__(self):
         s = '{name}({num_embeddings}, {embedding_dim}'

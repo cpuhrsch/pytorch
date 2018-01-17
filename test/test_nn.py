@@ -1216,9 +1216,17 @@ class TestNN(NNTestCase):
             expected_output = expected_output.cuda()
             expected_grad_weight = expected_grad_weight.cuda()
 
+        # # print("input_python" + str(input))
+        # # print("offsets_python" + str(offsets))
         output = es(input, offsets)
         output.backward(grad_output)
 
+        # print(output.data)
+        # print(expected_output)
+        # print("es.weight.grad.data")
+        # print(es.weight.grad.data)
+        # print("expected_grad_weight")
+        # print(expected_grad_weight)
         self.assertEqual(output.data, expected_output)
         self.assertEqual(es.weight.grad.data, expected_grad_weight)
 
@@ -1228,6 +1236,10 @@ class TestNN(NNTestCase):
         output = es(input)
         output.backward(grad_output)
 
+        # # print("es.weight.grad.data2")
+        # # print(es.weight.grad.data)
+        # # print("expected_grad_weight2")
+        # # print(expected_grad_weight)
         self.assertEqual(output.data, expected_output)
         self.assertEqual(es.weight.grad.data, expected_grad_weight)
 
@@ -1255,8 +1267,20 @@ class TestNN(NNTestCase):
 
             self.assertEqual(output, ref_output)
 
+            # print("input")
+            # print(input)
+            # print("offsets")
+            # print(offsets)
+            # print("output")
+            # print(output)
+            # print("ref_output")
+            # print(ref_output)
             output.backward(grad_output)
             ref_output.backward(grad_output)
+            # print("es.weight.grad")
+            # print(es.weight.grad)
+            # print("e.weight.grad")
+            # print(e.weight.grad)
             self.assertEqual(es.weight.grad, e.weight.grad)
 
         N, D, B, L = random.randint(1, 100), random.randint(1, 100), random.randint(1, 50), random.randint(1, 50)
