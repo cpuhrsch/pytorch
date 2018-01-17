@@ -1,6 +1,9 @@
 import torch
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
+from torch.autograd.function import Function
+from torch._thnn import type2backend
+from torch.autograd.function import once_differentiable
 
 from .module import Module
 from .. import functional as F

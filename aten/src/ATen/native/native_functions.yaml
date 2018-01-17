@@ -163,9 +163,6 @@
 - func: embedding(Tensor weight, IndexTensor indices, int64_t padding_idx=-1, bool scale_grad_by_freq=false, bool sparse=false) -> Tensor
   variants: function
 
-- func: embedding_backward(Tensor grad, IndexTensor indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq, bool sparse) -> Tensor
-  variants: function
-
 - func: embedding_dense_backward(Tensor grad, IndexTensor indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) -> Tensor
   variants: function
   dispatch:
@@ -180,6 +177,21 @@
 
 - func: embedding_sparse_backward(Tensor grad, IndexTensor indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) -> Tensor
   variants: function
+
+- func: embedding_backward(Tensor grad, IndexTensor indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq, bool sparse) -> Tensor
+  variants: function
+
+- func: embedding_bag(Tensor weight, IndexTensor indices, IndexTensor offsets, IndexTensor offset2bag, bool scale_grad_by_freq=false, int64_t mode=0) -> Tensor
+  variants: function
+  dispatch:
+    CPU: embedding_bag_cpu
+    CUDA: embedding_bag_cuda
+
+- func: embedding_bag_backward(Tensor grad, IndexTensor indices, IndexTensor offsets, IndexTensor offset2bag, int64_t num_weights, bool scale_grad_by_freq, int64_t mode) -> Tensor
+  variants: function
+  dispatch:
+    CPU: embedding_bag_backward_cpu
+    CUDA: embedding_bag_backward_cuda
 
 - func: expand(Tensor self, IntList size) -> Tensor
 

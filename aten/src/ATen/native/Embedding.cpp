@@ -80,6 +80,7 @@ Tensor embedding_backward_cpu(
     const Tensor & grad_, const Tensor & indices, int64_t num_weights,
     int64_t padding_idx, bool scale_grad_by_freq) {
 
+// std::cerr << "embedding grad_: " << grad_ << std::endl;
   auto indices_arg = TensorArg(indices, "indices", 2);
   checkScalarType("embedding_backward", indices_arg, kLong);
   checkContiguous("embedding_backward", indices_arg);
