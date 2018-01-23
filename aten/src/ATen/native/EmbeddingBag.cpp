@@ -53,6 +53,7 @@ static Tensor apply_bag_size_backward(const Tensor &offsets,
   return output;
 }
 
+// TODO: More benchmarks!
 // TODO: Is it ok if offsets is [0, 0, 0]? - Orig versions and this one appear
 // to disagree
 Tensor embedding_bag_cpu(const Tensor &weight, const Tensor &indices,
