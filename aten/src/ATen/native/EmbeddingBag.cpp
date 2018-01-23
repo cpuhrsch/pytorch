@@ -12,10 +12,6 @@
 #include <omp.h>
 #endif
 
-#if AT_CUDA_ENABLED()
-#include "cuda/EmbeddingBag.h"
-#endif
-
 namespace at {
 namespace native {
 
@@ -49,14 +45,24 @@ Tensor embedding_bag_backward(const Tensor &grad_, const Tensor &indices,
                                   const Tensor &offsets,
                                   const Tensor &offset2bag, int64_t num_weights,
                                   bool scale_grad_by_freq, int64_t mode, bool sparse) {
-#if AT_CUDA_ENABLED()
-  if (!sparse && grad.is_cuda()) {
-    return embedding_bag_backward_cuda(grad_, indices,
+  if (sparse) {
+    return at::embedding_bag_sparse_backward(grad_, indices,
                                   offsets,
                                   offset2bag, num_weights,
-                                  scale_grad_by_freq, mode, sparse);
+                                  scale_grad_by_freq, mode);
+  } else {
+    return at::embedding_bag_dense_backward(grad_, indices,
+                                  offsets,
+                                  offset2bag, num_weights,
+                                  scale_grad_by_freq, mode);
   }
-#endif
+}
+
+Tensor embedding_bag_backward_cpu(const Tensor &grad_, const Tensor &indices,
+                                  const Tensor &offsets,
+                                  const Tensor &offset2bag, int64_t num_weights,
+                                  bool scale_grad_by_freq, int64_t mode) {
+
   Tensor grad = grad_;
   // std::cerr << "STARTING BACKWARD CPU" << std::endl;
   // std::cerr << "grad_: " << grad_ << std::endl;
@@ -88,6 +94,47 @@ Tensor embedding_bag_backward(const Tensor &grad_, const Tensor &indices,
   // std::cerr << "post index_grad: " << index_grad << std::endl;
   // std::cerr << "sparse: " << sparse << std::endl;
 
+  bool sparse = false;
+  return native::embedding_backward(index_grad, indices, num_weights, -1,
+                                    scale_grad_by_freq, sparse);
+}
+Tensor embedding_bag_sparse_backward(const Tensor &grad_, const Tensor &indices,
+                                  const Tensor &offsets,
+                                  const Tensor &offset2bag, int64_t num_weights,
+                                  bool scale_grad_by_freq, int64_t mode) {
+
+  Tensor grad = grad_;
+  // std::cerr << "STARTING BACKWARD CPU" << std::endl;
+  // std::cerr << "grad_: " << grad_ << std::endl;
+  // std::cerr << "mode: " << mode << std::endl;
+  // std::cerr << "indices: " << indices << std::endl;
+  // std::cerr << "offsets: " << offsets << std::endl;
+  // std::cerr << "offset2bag: " << offset2bag << std::endl;
+
+  // Tensor index_grad = grad_.type().tensor({offset2bag.sizes()[0], grad_.sizes()[1]});
+  Tensor index_grad = grad_.index_select(0, offset2bag);
+  // std::cerr << "index_grad: " << index_grad << std::endl;
+  if (mode == 1) { // MODE_MEAN
+    if (offsets.sizes()[0] == 1) {
+      auto bag_size = indices.sizes()[0];
+      // std::cerr << "scalar bag size: " << bag_size << std::endl;
+      index_grad /= bag_size;
+    } else {
+      auto bag_size = index_grad.type().tensor(offsets.sizes());
+      bag_size.slice(0, 0, bag_size.sizes()[0] - 1, 1) =
+          offsets.slice(0, 1, offsets.sizes()[0], 1) -
+          offsets.slice(0, 0, offsets.sizes()[0] - 1, 1);
+      bag_size[-1] = indices.sizes()[0] - offsets[-1];
+      // std::cerr << "bag_size1: " << bag_size << std::endl;
+      bag_size = bag_size.unsqueeze(1).index_select(0, offset2bag);
+      // std::cerr << "bag_size2: " << bag_size << std::endl;
+      index_grad /= bag_size;
+    }
+  }
+  // std::cerr << "post index_grad: " << index_grad << std::endl;
+  // std::cerr << "sparse: " << sparse << std::endl;
+
+  bool sparse = true;
   return native::embedding_backward(index_grad, indices, num_weights, -1,
                                     scale_grad_by_freq, sparse);
 }

@@ -1,4 +1,19 @@
-#include "EmbeddingBag.h"
+#include "ATen/ATen.h"
+#include "ATen/Check.h"
+#include "ATen/Dispatch.h"
+#include "ATen/NativeFunctions.h"
+
+#include "ATen/cuda/AccumulateType.h"
+
+#include <THC/THCDeviceUtils.cuh>
+#include <THC/THCNumerics.cuh>
+#include <THC/THCTensorMathReduce.cuh>
+#include <THC/THCTensorSort.cuh>
+#include <THC/THCThrustAllocator.cuh>
+#include <THCUNN/THCHalfAutoNumerics.cuh>
+
+#include <thrust/execution_policy.h>
+#include <thrust/unique.h>
 
 const int WARP_SIZE = 32;
 const int MODE_SUM = 0;
@@ -130,7 +145,7 @@ __global__ void EmbeddingBag_accGradParametersKernel(
 
 Tensor embedding_bag_cuda(const Tensor &weight, const Tensor &indices,
                           const Tensor &offsets, const Tensor &offset2bag,
-                          const bool scale_grad_by_freq, const int64_t mode) {
+                          const bool scale_grad_by_freq, const int64_t mode, bool sparse) {
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarType("embedding_bag_cuda", indices_arg, kLong);
   checkContiguous("embedding_bag_cuda", indices_arg);
