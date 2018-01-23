@@ -1219,15 +1219,9 @@ class TestNN(NNTestCase):
         output = es(input, offsets)
         output.backward(grad_output)
 
-        print(output.data)
-        print(expected_output)
         es_weight_grad = es.weight.grad.data
         if sparse:
             es_weight_grad = es.weight.grad.data.to_dense()
-        print("es.weight.grad.data")
-        print(es.weight.grad.data)
-        print("expected_grad_weight")
-        print(expected_grad_weight)
         self.assertEqual(output.data, expected_output)
         self.assertEqual(es_weight_grad, expected_grad_weight)
 
