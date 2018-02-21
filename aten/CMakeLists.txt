@@ -32,6 +32,17 @@ ENDIF(NOT MSVC)
 
 INCLUDE(CheckCXXSourceCompiles)
 
+# windef.h will define max/min macros if NOMINMAX is not defined
+IF(MSVC)
+  add_definitions(/DNOMINMAX)
+ENDIF(MSVC)
+
+# # Pre 2015 MSVC can't deal with varible length arrays
+# # So we might want to throw an error if they're being used.
+# IF(NOT MSVC)
+#   add_definitions("-Werror=vla")
+# ENDIF(NOT MSVC)
+
 #Check if certain std functions are supported. Sometimes
 #_GLIBCXX_USE_C99 macro is not defined and some functions are missing.
 CHECK_CXX_SOURCE_COMPILES("
@@ -396,6 +407,7 @@ set(ATen_CUDA_INCLUDE)
 SET(ATEN_INSTALL_BIN_SUBDIR "bin" CACHE PATH "ATen install binary subdirectory")
 SET(ATEN_INSTALL_LIB_SUBDIR "lib" CACHE PATH "ATen install library subdirectory")
 SET(ATEN_INSTALL_INCLUDE_SUBDIR "include" CACHE PATH "ATen install include subdirectory")
+
 
 add_definitions(-DTH_INDEX_BASE=0)
 set(TH_LINK_STYLE STATIC)
