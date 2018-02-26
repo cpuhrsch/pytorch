@@ -1159,7 +1159,7 @@ def embedding_bag(embedding_matrix, indices, offsets=None,
 
     if max_norm is not None:
         with torch.no_grad():
-            torch._C._VariableFunctions.embedding_renorm_(weight, input, max_norm, norm_type)
+            torch._C._VariableFunctions.embedding_renorm_(embedding_matrix, input, max_norm, norm_type)
 
     ret, _, _ = torch._C._VariableFunctions.embedding_bag(
         embedding_matrix,

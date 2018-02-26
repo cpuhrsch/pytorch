@@ -1302,9 +1302,9 @@ class TestNN(NNTestCase):
         self.assertEqual(es_weight_grad, expected_grad_weight)
 
         # now compare EmbeddingBag vs Embedding + Sum/Mean, for constant bag length
-        def _test_vs_Embedding(N, D, B, L):
-            es = nn.EmbeddingBag(N, D, mode=mode, sparse=sparse)
-            e = nn.Embedding(N, D)
+        def _test_vs_Embedding(N, D, B, L, max_norm=None, scale=False):
+            es = nn.EmbeddingBag(N, D, mode=mode, sparse=sparse, max_norm=max_norm, scale_grad_by_freq=scale)
+            e = nn.Embedding(N, D, max_norm=1.0)
             e.weight.data.copy_(es.weight.data)
             input = Variable(torch.rand(B, L).mul(N).long())
             offsets = Variable(torch.arange(0, B).mul(L).long())
@@ -1332,10 +1332,12 @@ class TestNN(NNTestCase):
                 es_weight_grad = es.weight.grad.data.to_dense()
             self.assertEqual(es_weight_grad, e.weight.grad.data)
 
-        N, D, B, L = random.randint(1, 100), random.randint(1, 100), random.randint(1, 50), random.randint(1, 50)
-        _test_vs_Embedding(N, D, B, L)
-        for p in itertools.product([1, 2], repeat=4):
-            _test_vs_Embedding(*p)
+        for max_norm in [None, 1.0]:
+            for scale in [True, False]:
+                N, D, B, L = random.randint(1, 100), random.randint(1, 100), random.randint(1, 50), random.randint(1, 50)
+                _test_vs_Embedding(N, D, B, L, max_norm=max_norm, scale=scale)
+                for p in itertools.product([1, 2], repeat=4):
+                    _test_vs_Embedding(*p, max_norm=max_norm, scale=scale)
 
         # check that giving illegal input combos raises error
         es = nn.EmbeddingBag(10, 20, mode=mode, sparse=sparse)
