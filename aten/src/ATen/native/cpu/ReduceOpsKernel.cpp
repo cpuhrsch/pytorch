@@ -89,19 +89,21 @@ inline void dimreduce_kernel_(const scalar_t *arr, scalar_t *outarr,
 }
 
 template <template <class> class PRED, CPUCapability C>
-inline void allImpl(Tensor & result, const Tensor & self, size_t dim, bool all, std::string name, int64_t init) {
+inline void allImpl(Tensor &result, const Tensor &self, size_t dim, bool all,
+                    const char *name, int64_t init) {
   AT_DISPATCH_ALL_TYPES(self.type(), name, [&] {
     if (all) {
       result.fill_(parallel_reduce<scalar_t, PRED>(
-          &allreduce_kernel_<scalar_t, PRED, CURRENT_CAPABILITY>, self.data<scalar_t>(),
-          (size_t)0, (size_t)self.numel(), (scalar_t)init));
+          &allreduce_kernel_<scalar_t, PRED, CURRENT_CAPABILITY>,
+          self.data<scalar_t>(), (size_t)0, (size_t)self.numel(),
+          (scalar_t)init));
     } else {
-      parallel_for_2d<scalar_t>(&dimreduce_kernel_<scalar_t, PRED, CURRENT_CAPABILITY>,
-                                self.sizes()[dim], self.strides()[dim],
-                                self.numel(), self.data<scalar_t>(),
-                                result.data<scalar_t>());
+      parallel_for_2d<scalar_t>(
+          &dimreduce_kernel_<scalar_t, PRED, CURRENT_CAPABILITY>,
+          self.sizes()[dim], self.strides()[dim], self.numel(),
+          self.data<scalar_t>(), result.data<scalar_t>());
     }
-    });
+  });
 }
 
 template <>
