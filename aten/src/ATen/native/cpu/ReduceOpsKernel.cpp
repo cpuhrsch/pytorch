@@ -90,7 +90,7 @@ inline void dimreduce_kernel_(const scalar_t *arr, scalar_t *outarr,
 template <template <class> class PRED, CPUCapability C>
 inline void allImpl(Tensor &result, const Tensor &self, size_t dim, bool all,
                     const char *name, int64_t init) {
-  AT_DISPATCH_ALL_TYPES(self.type(), name, [&] {
+  AT_DISPATCH_FLOATING_TYPES(self.type(), name, [&] {
     if (all) {
       result.fill_(parallel_reduce<scalar_t, PRED>(
           &allreduce_kernel_<scalar_t, PRED, CURRENT_CAPABILITY>,
