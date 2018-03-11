@@ -37,7 +37,6 @@ inline scalar_t allreduce_kernel_(const scalar_t *arr, size_t start, size_t end,
   }
   if (k > 0) {
     scalar_t sarr[32 / sizeof(scalar_t)];
-    memset(sarr, 0, 32);
     part_sum.store(sarr);
     for (size_t i = 0; i < part_sum.size(); i++) {
       sum = PRED<scalar_t>()(sum, sarr[i]);

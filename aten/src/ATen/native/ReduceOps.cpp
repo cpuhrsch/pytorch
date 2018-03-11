@@ -32,7 +32,7 @@ Tensor _sum_cuda(const Tensor &self_) {
   return self_._sumall(); }
 
 Tensor sum(const Tensor &self, int64_t dim_, bool keepdim) {
-  int64_t dim = maybe_wrap_dim(dim_, self.dim());
+  int64_t dim = maybe_wrap_dim(dim_, self);
   Tensor result = self.type().tensor();
   if (self.numel() == 1 && self.ndimension() == 0) {
     result.resize_({});
@@ -91,7 +91,7 @@ Tensor _prod_cpu(const Tensor &self) {
 Tensor _prod_cuda(const Tensor &self_) { return self_._prodall(); }
 
 Tensor prod(const Tensor &self, int64_t dim_, bool keepdim) {
-  int64_t dim = maybe_wrap_dim(dim_, self.dim());
+  int64_t dim = maybe_wrap_dim(dim_, self);
   Tensor result = self.type().tensor();
   if (self.numel() == 1 && self.ndimension() == 0) {
     result.resize_({});
