@@ -34,33 +34,53 @@
 
 namespace at {
 namespace native {
-namespace vec256 {
+namespace pow2vec {
 
-template <class T> class Vec256 {
+// W must be a power of 2 and specifies the number of bytes. 
+// 32 bytes is 256 bits which is the size of a AVX/AVX2 register
+template <size_t W, class T> class Pow2Vec {
 public:
-  T values[32 / sizeof(T)]; // Mimics AVX behavior
+  T values[W / sizeof(T)]; // Mimics AVX behavior
   inline void load(const T *ptr) { 
-    std::memcpy(values, ptr, 32); 
-  for (size_t i = 0; i < size(); i++) {
-  }
+    std::memcpy(values, ptr, W); 
   };
-  inline void store(T *ptr) { std::memcpy(ptr, values, 32); }
-  inline size_t size() { return 32 / sizeof(T); }
-  inline void operator=(const Vec256<T> &b) {
-    std::memcpy(values, b.values, 32);
+  inline void store(T *ptr) { std::memcpy(ptr, values, W); }
+  inline size_t size() { return W / sizeof(T); }
+  inline void operator=(const Pow2Vec<W, T> &b) {
+    std::memcpy(values, b.values, W);
   }
 };
 
-template <class T> Vec256<T> operator+(const Vec256<T> &a, const Vec256<T> &b) {
-  Vec256<T> c = Vec256<T>();
+template <class T>
+T operator+(const T &a, const T &b) {
+  T c = T();
   for (size_t i = 0; i < c.size(); i++) {
     c.values[i] = a.values[i] + b.values[i];
   }
   return c;
 }
 
-template <class T> Vec256<T> operator*(const Vec256<T> &a, const Vec256<T> &b) {
-  Vec256<T> c = Vec256<T>();
+template <class T>
+T operator*(const T &a, const T &b) {
+  T c = T();
+  for (size_t i = 0; i < c.size(); i++) {
+    c.values[i] = a.values[i] * b.values[i];
+  }
+  return c;
+}
+
+template <class AW, class AT>
+AW vecsum(const AT &a, const AT &b) {
+  AW c = AW();
+  for (size_t i = 0; i < c.size(); i++) {
+    c.values[i] = a.values[i] + b.values[i];
+  }
+  return c;
+}
+
+template <class AW, class AT>
+AW vecmult(const AT &a, const AT &b) {
+  AW c = AW();
   for (size_t i = 0; i < c.size(); i++) {
     c.values[i] = a.values[i] * b.values[i];
   }
@@ -68,62 +88,62 @@ template <class T> Vec256<T> operator*(const Vec256<T> &a, const Vec256<T> &b) {
 }
 
 #ifdef __AVX__
-template <> class Vec256<float> {
+template <> class Pow2Vec<32, float> {
 public:
   __m256 values;
-  Vec256<float>() {}
+  Pow2Vec<32, float>() {}
   inline void load(const float *ptr) { values = _mm256_loadu_ps(ptr); }
   inline void store(float *ptr) { _mm256_storeu_ps(ptr, values); }
   inline size_t size() { return 32 / sizeof(float); }
-  inline void operator=(const Vec256<float> &b) { values = b.values; }
+  inline void operator=(const Pow2Vec<32, float> &b) { values = b.values; }
 };
 
-template <> class Vec256<double> {
+template <> class Pow2Vec<32, double> {
 public:
   __m256d values;
-  Vec256<double>() {}
+  Pow2Vec<32, double>() {}
   inline void load(const double *ptr) { values = _mm256_loadu_pd(ptr); }
   inline void store(double *ptr) { _mm256_storeu_pd(ptr, values); }
   inline size_t size() { return 32 / sizeof(double); }
-  inline void operator=(const Vec256<double> &b) { values = b.values; }
+  inline void operator=(const Pow2Vec<32, double> &b) { values = b.values; }
 };
 
 template <>
-Vec256<float> inline operator+(const Vec256<float> &a, const Vec256<float> &b) {
-  Vec256<float> c = Vec256<float>();
+Pow2Vec<32, float> inline operator+(const Pow2Vec<32, float> &a, const Pow2Vec<32, float> &b) {
+  Pow2Vec<32, float> c = Pow2Vec<32, float>();
   c.values = _mm256_add_ps(a.values, b.values);
   return c;
 }
 
 template <>
-Vec256<float> inline operator*(const Vec256<float> &a, const Vec256<float> &b) {
-  Vec256<float> c = Vec256<float>();
+Pow2Vec<32, float> inline operator*(const Pow2Vec<32, float> &a, const Pow2Vec<32, float> &b) {
+  Pow2Vec<32, float> c = Pow2Vec<32, float>();
   c.values = _mm256_mul_ps(a.values, b.values);
   return c;
 }
 
 template <>
-Vec256<double> inline operator+(const Vec256<double> &a,
-                                const Vec256<double> &b) {
-  Vec256<double> c = Vec256<double>();
+Pow2Vec<32, double> inline operator+(const Pow2Vec<32, double> &a,
+                                const Pow2Vec<32, double> &b) {
+  Pow2Vec<32, double> c = Pow2Vec<32, double>();
   c.values = _mm256_add_pd(a.values, b.values);
   return c;
 }
 
 template <>
-Vec256<double> inline operator*(const Vec256<double> &a,
-                                const Vec256<double> &b) {
-  Vec256<double> c = Vec256<double>();
+Pow2Vec<32, double> inline operator*(const Pow2Vec<32, double> &a,
+                                const Pow2Vec<32, double> &b) {
+  Pow2Vec<32, double> c = Pow2Vec<32, double>();
   c.values = _mm256_mul_pd(a.values, b.values);
   return c;
 }
 #endif
 
 #ifdef __AVX2__
-template <> class Vec256<int64_t> {
+template <> class Pow2Vec<32, int64_t> {
 public:
   __m256i values;
-  Vec256<int64_t>() {}
+  Pow2Vec<32, int64_t>() {}
   inline void load(const int64_t *ptr) {
     values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
   }
@@ -131,13 +151,13 @@ public:
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(ptr), values);
   }
   inline size_t size() { return 32 / sizeof(int64_t); }
-  inline void operator=(const Vec256<int64_t> &b) { values = b.values; }
+  inline void operator=(const Pow2Vec<32, int64_t> &b) { values = b.values; }
 };
 
-template <> class Vec256<int32_t> {
+template <> class Pow2Vec<32, int32_t> {
 public:
   __m256i values;
-  Vec256<int32_t>() {}
+  Pow2Vec<32, int32_t>() {}
   inline void load(const int32_t *ptr) {
     values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
   }
@@ -145,13 +165,13 @@ public:
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(ptr), values);
   }
   inline size_t size() { return 32 / sizeof(int32_t); }
-  inline void operator=(const Vec256<int32_t> &b) { values = b.values; }
+  inline void operator=(const Pow2Vec<32, int32_t> &b) { values = b.values; }
 };
 
-template <> class Vec256<int16_t> {
+template <> class Pow2Vec<32, int16_t> {
 public:
   __m256i values;
-  Vec256<int16_t>() {}
+  Pow2Vec<32, int16_t>() {}
   inline void load(const int16_t *ptr) {
     values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
   }
@@ -159,29 +179,29 @@ public:
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(ptr), values);
   }
   inline size_t size() { return 32 / sizeof(int16_t); }
-  inline void operator=(const Vec256<int16_t> &b) { values = b.values; }
+  inline void operator=(const Pow2Vec<32, int16_t> &b) { values = b.values; }
 };
 
 template <>
-Vec256<int64_t> inline operator+(const Vec256<int64_t> &a,
-                                 const Vec256<int64_t> &b) {
-  Vec256<int64_t> c = Vec256<int64_t>();
+Pow2Vec<32, int64_t> inline operator+(const Pow2Vec<32, int64_t> &a,
+                                 const Pow2Vec<32, int64_t> &b) {
+  Pow2Vec<32, int64_t> c = Pow2Vec<32, int64_t>();
   c.values = _mm256_add_epi64(a.values, b.values);
   return c;
 }
 
 template <>
-Vec256<int32_t> inline operator+(const Vec256<int32_t> &a,
-                                 const Vec256<int32_t> &b) {
-  Vec256<int32_t> c = Vec256<int32_t>();
+Pow2Vec<32, int32_t> inline operator+(const Pow2Vec<32, int32_t> &a,
+                                 const Pow2Vec<32, int32_t> &b) {
+  Pow2Vec<32, int32_t> c = Pow2Vec<32, int32_t>();
   c.values = _mm256_add_epi32(a.values, b.values);
   return c;
 }
 
 template <>
-Vec256<int16_t> inline operator+(const Vec256<int16_t> &a,
-                                 const Vec256<int16_t> &b) {
-  Vec256<int16_t> c = Vec256<int16_t>();
+Pow2Vec<32, int16_t> inline operator+(const Pow2Vec<32, int16_t> &a,
+                                 const Pow2Vec<32, int16_t> &b) {
+  Pow2Vec<32, int16_t> c = Pow2Vec<32, int16_t>();
   c.values = _mm256_add_epi16(a.values, b.values);
   return c;
 }
@@ -191,9 +211,9 @@ Vec256<int16_t> inline operator+(const Vec256<int16_t> &a,
 // This is also technically avx compatible, but then we'll need AVX
 // code for add as well.
 template <>
-Vec256<int64_t> inline operator*(const Vec256<int64_t> &a,
-                                 const Vec256<int64_t> &b) {
-  Vec256<int64_t> c = Vec256<int64_t>();
+Pow2Vec<32, int64_t> inline operator*(const Pow2Vec<32, int64_t> &a,
+                                 const Pow2Vec<32, int64_t> &b) {
+  Pow2Vec<32, int64_t> c = Pow2Vec<32, int64_t>();
 
   int64_t a0 = _mm256_extract_epi64(a.values, 0);
   int64_t a1 = _mm256_extract_epi64(a.values, 1);
@@ -215,17 +235,17 @@ Vec256<int64_t> inline operator*(const Vec256<int64_t> &a,
 }
 
 template <>
-Vec256<int32_t> inline operator*(const Vec256<int32_t> &a,
-                                 const Vec256<int32_t> &b) {
-  Vec256<int32_t> c = Vec256<int32_t>();
+Pow2Vec<32, int32_t> inline operator*(const Pow2Vec<32, int32_t> &a,
+                                 const Pow2Vec<32, int32_t> &b) {
+  Pow2Vec<32, int32_t> c = Pow2Vec<32, int32_t>();
   c.values = _mm256_mullo_epi32(a.values, b.values);
   return c;
 }
 
 template <>
-Vec256<int16_t> inline operator*(const Vec256<int16_t> &a,
-                                 const Vec256<int16_t> &b) {
-  Vec256<int16_t> c = Vec256<int16_t>();
+Pow2Vec<32, int16_t> inline operator*(const Pow2Vec<32, int16_t> &a,
+                                 const Pow2Vec<32, int16_t> &b) {
+  Pow2Vec<32, int16_t> c = Pow2Vec<32, int16_t>();
   c.values = _mm256_mullo_epi16(a.values, b.values);
   return c;
 }

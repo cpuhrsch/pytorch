@@ -9,20 +9,20 @@ namespace native {
 
 constexpr size_t _THRESHOLD = 32768;
 
-template <class T, template <class> class PRED>
-T parallel_reduce(T (*f)(const T *, size_t, size_t, T), const T *data,
-                  size_t start, size_t end, T init_) {
-  T result_;
+template <class AT, class T, template <class> class SPRED>
+AT parallel_reduce(AT (*f)(const T *, size_t, size_t, AT), const T *data,
+                  size_t start, size_t end, AT init_) {
+  AT result_;
   static tbb::affinity_partitioner ap;
   if ((size_t)(end - start) < _THRESHOLD) {
     result_ = f(data, start, end, init_);
   } else {
     result_ = tbb::parallel_reduce(
         tbb::blocked_range<size_t>(start, end, _THRESHOLD), init_,
-        [&data, &f](const tbb::blocked_range<size_t> r, T init) -> T {
+        [&data, &f](const tbb::blocked_range<size_t> r, AT init) -> AT {
           return f(data, r.begin(), r.end(), init);
         },
-        PRED<T>(), ap);
+        SPRED<AT>(), ap);
   }
   return result_;
 }
