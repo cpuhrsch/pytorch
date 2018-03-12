@@ -590,3 +590,13 @@
 
 - func: _cudnn_init_dropout_state(Type ty, double dropout, bool train, int64_t dropout_seed) -> Tensor
   variants: function
+
+- func: atan(Tensor self) -> Tensor
+
+- func: atan_(Tensor self) -> Tensor
+
+- func: atan_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _atan_out_cpu
+    CUDA: _atan_out_cuda

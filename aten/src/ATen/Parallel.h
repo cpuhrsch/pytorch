@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <ATen/ATen.h>
 #include <tbb/tbb.h>
 
 namespace at {
@@ -76,6 +77,29 @@ void parallel_reduce_2d(void (*f)(const T *, T *, size_t, size_t), size_t num_ro
                         }
                       },
                       ap);
+  }
+}
+
+template <class T>
+void parallel_for_1d(void (*f)(T *, const T *, size_t, size_t), Tensor &result, const Tensor &self) {
+
+  internal::init_tbb_num_threads();
+
+  static tbb::affinity_partitioner ap;
+
+  T *arr_out = result.data<T>();
+  const T *arr_in = self.data<T>();
+  size_t start = 0;
+  size_t end = self.numel();
+  if ((end - start) < internal::TBB_GRAIN_SIZE) {
+    f(arr_out, arr_in, start, end);
+  } else {
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(start, end, internal::TBB_GRAIN_SIZE),
+        [&arr_out, &arr_in, &f](const tbb::blocked_range<size_t> r) {
+          f(arr_out, arr_in, r.begin(), r.end());
+        },
+        ap);
   }
 }
 }

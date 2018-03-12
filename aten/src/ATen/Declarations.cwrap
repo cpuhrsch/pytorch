@@ -1550,20 +1550,8 @@
     - THTensor* self
 ]]
 [[
-  name: atan_
-  types:
-    - floating_point
-  backends:
-    - CPU
-    - CUDA
+  name: _atan
   cname: atan
-  return: self
-  arguments:
-    - THTensor* self
-    - THTensor* self
-]]
-[[
-  name: atan
   types:
     - floating_point
   backends:

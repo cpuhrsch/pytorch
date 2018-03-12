@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
 #include <iostream>
 
 
@@ -44,26 +45,49 @@ public:
   inline void load(const T *ptr) { 
     std::memcpy(values, ptr, 32); 
   };
-  inline void store(T *ptr) { std::memcpy(ptr, values, 32); }
-  inline size_t size() { return 32 / sizeof(T); }
+  inline void store(T *ptr) const { std::memcpy(ptr, values, 32); }
+  static constexpr size_t size = 32 / sizeof(T);
   inline void operator=(const Vec256<T> &b) {
     std::memcpy(values, b.values, 32);
   }
 };
 
 template <class T> Vec256<T> operator+(const Vec256<T> &a, const Vec256<T> &b) {
-  Vec256<T> c = Vec256<T>();
-  for (size_t i = 0; i < c.size(); i++) {
-    c.values[i] = a.values[i] + b.values[i];
+  T a_arr[a.size];
+  T b_arr[a.size];
+  T c_arr[a.size];
+  a.store(a_arr);
+  b.store(b_arr);
+  for (size_t i = 0; i < a.size; i++) {
+    c_arr[i] = a_arr[i] + b_arr[i];
   }
+  Vec256<T> c = Vec256<T>();
+  c.store(c_arr);
   return c;
 }
 
 template <class T> Vec256<T> operator*(const Vec256<T> &a, const Vec256<T> &b) {
-  Vec256<T> c = Vec256<T>();
-  for (size_t i = 0; i < c.size(); i++) {
-    c.values[i] = a.values[i] * b.values[i];
+  T a_arr[a.size];
+  T b_arr[a.size];
+  T c_arr[a.size];
+  a.store(a_arr);
+  b.store(b_arr);
+  for (size_t i = 0; i < a.size; i++) {
+    c_arr[i] = a_arr[i] * b_arr[i];
   }
+  Vec256<T> c = Vec256<T>();
+  c.store(c_arr);
+  return c;
+}
+
+template <class T> Vec256<T> map(T (*f)(T), const Vec256<T> &a) {
+  T arr[a.size];
+  a.store(arr);
+  for (size_t i = 0; i < a.size; i++) {
+    arr[i] = f(arr[i]);
+  }
+  Vec256<T> c;
+  c.load(arr);
   return c;
 }
 
@@ -73,8 +97,8 @@ public:
   __m256 values;
   Vec256<float>() {}
   inline void load(const float *ptr) { values = _mm256_loadu_ps(ptr); }
-  inline void store(float *ptr) { _mm256_storeu_ps(ptr, values); }
-  inline size_t size() { return 32 / sizeof(float); }
+  inline void store(float *ptr) const { _mm256_storeu_ps(ptr, values); }
+  static constexpr size_t size  = 8;
   inline void operator=(const Vec256<float> &b) { values = b.values; }
 };
 
@@ -83,8 +107,8 @@ public:
   __m256d values;
   Vec256<double>() {}
   inline void load(const double *ptr) { values = _mm256_loadu_pd(ptr); }
-  inline void store(double *ptr) { _mm256_storeu_pd(ptr, values); }
-  inline size_t size() { return 32 / sizeof(double); }
+  inline void store(double *ptr) const { _mm256_storeu_pd(ptr, values); }
+  static constexpr size_t size  = 4;
   inline void operator=(const Vec256<double> &b) { values = b.values; }
 };
 
@@ -117,6 +141,7 @@ Vec256<double> inline operator*(const Vec256<double> &a,
   c.values = _mm256_mul_pd(a.values, b.values);
   return c;
 }
+
 #endif
 
 #ifdef __AVX2__
@@ -127,10 +152,10 @@ public:
   inline void load(const int64_t *ptr) {
     values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
   }
-  inline void store(int64_t *ptr) {
+  inline void store(int64_t *ptr) const {
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(ptr), values);
   }
-  inline size_t size() { return 32 / sizeof(int64_t); }
+  static constexpr size_t size  = 4;
   inline void operator=(const Vec256<int64_t> &b) { values = b.values; }
 };
 
@@ -141,10 +166,10 @@ public:
   inline void load(const int32_t *ptr) {
     values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
   }
-  inline void store(int32_t *ptr) {
+  inline void store(int32_t *ptr) const {
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(ptr), values);
   }
-  inline size_t size() { return 32 / sizeof(int32_t); }
+  static constexpr size_t size  = 8;
   inline void operator=(const Vec256<int32_t> &b) { values = b.values; }
 };
 
@@ -155,10 +180,10 @@ public:
   inline void load(const int16_t *ptr) {
     values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
   }
-  inline void store(int16_t *ptr) {
+  inline void store(int16_t *ptr) const {
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(ptr), values);
   }
-  inline size_t size() { return 32 / sizeof(int16_t); }
+  static constexpr size_t size  = 16;
   inline void operator=(const Vec256<int16_t> &b) { values = b.values; }
 };
 

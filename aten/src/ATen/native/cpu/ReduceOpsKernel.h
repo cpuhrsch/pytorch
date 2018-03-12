@@ -2,7 +2,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Parallel.h>
 #include "CapabilityDispatch.h"
-#include "Vec256.h"
 #include <stdexcept>
 
 

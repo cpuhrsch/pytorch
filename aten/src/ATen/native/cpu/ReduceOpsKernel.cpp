@@ -1,6 +1,7 @@
 #include "ATen/native/cpu/ReduceOpsKernel.h"
 #include "ATen/Dispatch.h"
 #include "ATen/Parallel.h"
+#include "ATen/native/cpu/Vec256.h"
 
 namespace at {
 namespace native {
@@ -38,7 +39,7 @@ inline scalar_t allreduce_kernel_(const scalar_t *arr, size_t start, size_t end,
   if (k > 0) {
     scalar_t sarr[32 / sizeof(scalar_t)];
     part_sum.store(sarr);
-    for (size_t i = 0; i < part_sum.size(); i++) {
+    for (size_t i = 0; i < part_sum.size; i++) {
       sum = OP<scalar_t>()(sum, sarr[i]);
     }
   }
