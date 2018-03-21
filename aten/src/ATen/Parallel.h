@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <ATen/ATen.h>
 #include <tbb/tbb.h>
 
 namespace at {
@@ -45,12 +46,18 @@ T parallel_reduce(T (*f)(const T *, size_t, size_t, T), const T *data,
 }
 
 template <class T>
-void parallel_reduce_2d(void (*f)(const T *, T *, size_t, size_t), size_t num_rows,
-                     size_t num_cols, size_t numel, const T *arr_, T *outarr_) {
+void parallel_reduce_2d(void (*f)(const T *, T *, size_t, size_t, size_t, size_t),
+                        Tensor &result, const Tensor &self, size_t dim) {
 
   internal::init_tbb_num_threads();
 
   static tbb::affinity_partitioner ap;
+
+  size_t num_rows = self.sizes()[dim];
+  size_t num_cols = self.strides()[dim];
+  size_t numel = self.numel();
+  const T *arr_ = self.data<T>();
+  T *outarr_ = result.data<T>();
 
   size_t max_i_ =
       (numel && num_rows && num_cols) ? numel / (num_rows * num_cols) : 0;
@@ -60,19 +67,19 @@ void parallel_reduce_2d(void (*f)(const T *, T *, size_t, size_t), size_t num_ro
       int64_t i_r = i_ * num_cols;
       const T* arr = arr_ + i;
       T* outarr = outarr_ + i_r;
-      f(arr, outarr, num_rows, num_cols);
+      f(arr, outarr, 0, num_cols, num_rows, num_cols);
     }
   } else {
-    tbb::parallel_for(tbb::blocked_range<size_t>(
-                          0, max_i_, 1),
+    tbb::parallel_for(tbb::blocked_range2d<size_t, size_t>(
+                          0, max_i_, 1, 0, num_cols, internal::TBB_GRAIN_SIZE),
                       [&arr_, &outarr_, num_rows, num_cols,
-                       &f](const tbb::blocked_range<size_t> r) {
-                        for (size_t i_ = r.begin(); i_ < r.end(); i_++) {
+                       &f](const tbb::blocked_range2d<size_t, size_t> r) {
+                        for (size_t i_ = r.rows().begin(); i_ < r.rows().end(); i_++) {
                           int64_t i = i_ * num_rows * num_cols;
                           int64_t i_r = i_ * num_cols;
                           const T *arr = arr_ + i;
                           T *outarr = outarr_ + i_r;
-                          f(arr, outarr, num_rows, num_cols);
+                          f(arr, outarr, r.cols().begin(), r.cols().end(), num_rows, num_cols);
                         }
                       },
                       ap);
