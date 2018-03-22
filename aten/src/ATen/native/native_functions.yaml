@@ -600,3 +600,13 @@
   dispatch:
     CPU: _atan_out_cpu
     CUDA: _atan_out_cuda
+
+- func: erf(Tensor self) -> Tensor
+
+- func: erf_(Tensor self) -> Tensor
+
+- func: erf_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _erf_out_cpu
+    CUDA: _erf_out_cuda

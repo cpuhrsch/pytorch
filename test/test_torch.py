@@ -229,23 +229,28 @@ class TestTorch(TestCase):
         self.assertRaises(RuntimeError, lambda: torch.addr(m, v, s))
         self.assertRaises(RuntimeError, lambda: torch.addr(m, s, v))
 
-
     def _testMath(self, torchfn, mathfn):
         def _testMathSize(size, self, torchfn, mathfn):
+            print("cont")
             # contiguous
             m1 = torch.randn(*size)
             res1 = torchfn(m1[4])
             res2 = res1.clone().zero_()
             for i, v in enumerate(m1[4]):
                 res2[i] = mathfn(v.item())
+            print(res1)
+            print(res2)
             self.assertEqual(res1, res2)
 
+            print("non-cont")
             # non-contiguous
             m1 = torch.randn(*size)
             res1 = torchfn(m1[:, 4])
             res2 = res1.clone().zero_()
             for i, v in enumerate(m1[:, 4]):
                 res2[i] = mathfn(v.item())
+            print(res1)
+            print(res2)
             self.assertEqual(res1, res2)
         _testMathSize((10, 5), self, torchfn, mathfn)
         _testMathSize((10, 5000), self, torchfn, mathfn)

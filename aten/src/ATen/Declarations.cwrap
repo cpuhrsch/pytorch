@@ -1596,20 +1596,8 @@
     - THTensor* self
 ]]
 [[
-  name: erf_
-  types:
-    - floating_point
-  backends:
-    - CPU
-    - CUDA
-  cname: erf
-  return: self
-  arguments:
-    - THTensor* self
-    - THTensor* self
-]]
-[[
-  name: erf
+  name: _erf
+  cname: atan
   types:
     - floating_point
   backends:

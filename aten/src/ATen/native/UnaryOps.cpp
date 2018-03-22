@@ -54,13 +54,29 @@ Tensor & atan_(Tensor &self) {
   return at::atan_out(self, self);
 }
 
+Tensor erf(const Tensor &self) {
+  Tensor result = self.type().tensor();
+  return at::erf_out(result, self);
+}
+
+Tensor & erf_(Tensor &self) {
+  return at::erf_out(self, self);
+}
+
 // \WRAP OPS #################################################################
+
+// TODO: Probably need to specialize in copy and in-place
 
 // CPU OPS #################################################################
 
-// TODO: Only use -mavx -mavx2 if compiiler is capabale
-// TODO: Probably need to specialize in copy and in-place
-// TODO: Add debug support for kernels
+template <typename T>
+static void _basic_apply(T (*f)(T), T* out, const T * in, size_t numel) {
+  std::cerr << "HERE!" << std::endl;
+  for (size_t i = 0; i < numel; i ++) {
+    out[i] = f(in[i]);
+  }
+}
+
 Tensor & _atan_out_cpu(Tensor & result, const Tensor & self) {
   if (result.is_contiguous() && self.is_contiguous()) {
     result.resize_(self.sizes());
@@ -70,12 +86,29 @@ Tensor & _atan_out_cpu(Tensor & result, const Tensor & self) {
   return at::_atan_out(result, self);
 }
 
+Tensor &_erf_out_cpu(Tensor &result, const Tensor &self) {
+  if (result.is_contiguous() && self.is_contiguous()) {
+    result.resize_(self.sizes());
+    result.zero_();
+    AT_DISPATCH_FLOATING_TYPES(self.type(), "erf", [&] {
+      _basic_apply<scalar_t>(std::erf, result.data<scalar_t>(),
+                             self.data<scalar_t>(), self.numel());
+    });
+    return result;
+  }
+  return at::_erf_out(result, self);
+}
+
 // \CPU OPS ################################################################
 
 // CUDA OPS #################################################################
 
 Tensor & _atan_out_cuda(Tensor & result, const Tensor & self) {
   return at::_atan_out(result, self);
+}
+
+Tensor & _erf_out_cuda(Tensor & result, const Tensor & self) {
+  return at::_erf_out(result, self);
 }
 
 // \CUDA OPS ################################################################
