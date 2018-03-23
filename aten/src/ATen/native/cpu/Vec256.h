@@ -80,11 +80,11 @@ template <class T> Vec256<T> operator*(const Vec256<T> &a, const Vec256<T> &b) {
   return c;
 }
 
-template <class T> Vec256<T> map(T (*f)(T), const Vec256<T> &a) {
+template <class T> Vec256<T> atan(const Vec256<T> &a) {
   T arr[a.size];
   a.store(arr);
   for (size_t i = 0; i < a.size; i++) {
-    arr[i] = f(arr[i]);
+    arr[i] = std::atan(arr[i]);
   }
   Vec256<T> c;
   c.load(arr);

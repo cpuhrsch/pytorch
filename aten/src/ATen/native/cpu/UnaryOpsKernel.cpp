@@ -44,12 +44,12 @@ inline void allImpl(Tensor & result, const Tensor &self, const char* name) {
   });
 }
 
-template <typename T, CPUCapability C> struct atanSOP {
-  constexpr T operator()(const T &x) const { return std::atan(x); }
+template <typename T, CPUCapability C> struct atanVOP {
+  Vec256<T> operator()(const Vec256<T> &x) const { return atan(x); }
 };
 
-template <typename T, CPUCapability C> struct atanVOP {
-  constexpr Vec256<T> operator()(const Vec256<T> &x) const { return map<T>(std::atan, x); }
+template <typename T, CPUCapability C> struct atanSOP {
+  T operator()(const T x) const { return std::atan(x); }
 };
 
 template <>

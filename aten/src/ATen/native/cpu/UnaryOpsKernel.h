@@ -34,5 +34,14 @@ template <CPUCapability C> struct atanImplC { static void function(Tensor & resu
 // template <CPUCapability C> struct tanh_ImplC { static void function(Tensor &self); };
 // template <CPUCapability C> struct trunc_ImplC { static void function(Tensor &self); };
 
+template <typename T> struct atanop {
+    T operator()(T &x) const { return std::atan(x); }
+};
+
+template<CPUCapability C, template <typename> class Functor>
+struct _applyC {
+  static void function(Tensor &result, const Tensor &self, const char *name);
+};
+
 }
 }

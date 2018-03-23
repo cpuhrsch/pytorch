@@ -21,21 +21,21 @@ template <typename... ArgTypes>
 struct DispatchStub<void(ArgTypes...)> {
   using FnType = void(ArgTypes...);
 
-  template <template <CPUCapability> class allImpl,
+  template <template <CPUCapability, class...Args> class allImpl,
             FnType **dispatch_ptr>
   static void init(ArgTypes... args) {
-    *dispatch_ptr = allImpl<CPUCapability::DEFAULT>::function;
+    *dispatch_ptr = allImpl<CPUCapability::DEFAULT, Args...>::function;
     // Check if platform is supported
     if (cpuinfo_initialize()) {
       // Set function pointer to best implementation last
 #if defined(HAVE_AVX_CPU_DEFINITION)
       if (cpuinfo_has_x86_avx()) {
-        *dispatch_ptr = allImpl<CPUCapability::AVX>::function;
+        *dispatch_ptr = allImpl<CPUCapability::AVX, Args...>::function;
       }
 #endif
 #if defined(HAVE_AVX2_CPU_DEFINITION)
       if (cpuinfo_has_x86_avx2()) {
-        *dispatch_ptr = allImpl<CPUCapability::AVX2>::function;
+        *dispatch_ptr = allImpl<CPUCapability::AVX2, Args...>::function;
       }
 #endif
     }

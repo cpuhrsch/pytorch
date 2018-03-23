@@ -1597,7 +1597,7 @@
 ]]
 [[
   name: _erf
-  cname: atan
+  cname: erf
   types:
     - floating_point
   backends:
