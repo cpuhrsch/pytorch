@@ -649,4 +649,105 @@
     CPU: _sqrt_out_cpu
     CUDA: _sqrt_out_cuda
 
+- func: acos(Tensor self) -> Tensor
+- func: asin(Tensor self) -> Tensor
+- func: atan(Tensor self) -> Tensor
+- func: cos(Tensor self) -> Tensor
+- func: cosh(Tensor self) -> Tensor
+- func: erf(Tensor self) -> Tensor
+- func: exp(Tensor self) -> Tensor
+- func: expm1(Tensor self) -> Tensor
+- func: lgamma(Tensor self) -> Tensor
+- func: log1p(Tensor self) -> Tensor
+- func: log(Tensor self) -> Tensor
+- func: sin(Tensor self) -> Tensor
+- func: sinh(Tensor self) -> Tensor
+- func: tan(Tensor self) -> Tensor
+
+- func: acos_(Tensor self) -> Tensor
+- func: asin_(Tensor self) -> Tensor
+- func: atan_(Tensor self) -> Tensor
+- func: cos_(Tensor self) -> Tensor
+- func: cosh_(Tensor self) -> Tensor
+- func: erf_(Tensor self) -> Tensor
+- func: exp_(Tensor self) -> Tensor
+- func: expm1_(Tensor self) -> Tensor
+- func: lgamma_(Tensor self) -> Tensor
+- func: log1p_(Tensor self) -> Tensor
+- func: log_(Tensor self) -> Tensor
+- func: sin_(Tensor self) -> Tensor
+- func: sinh_(Tensor self) -> Tensor
+- func: tan_(Tensor self) -> Tensor
+
+- func: acos_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _acos_out_cpu
+    CUDA: _acos_out_cuda
+- func: asin_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _asin_out_cpu
+    CUDA: _asin_out_cuda
+- func: atan_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _atan_out_cpu
+    CUDA: _atan_out_cuda
+- func: cos_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _cos_out_cpu
+    CUDA: _cos_out_cuda
+- func: cosh_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _cosh_out_cpu
+    CUDA: _cosh_out_cuda
+- func: erf_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _erf_out_cpu
+    CUDA: _erf_out_cuda
+- func: exp_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _exp_out_cpu
+    CUDA: _exp_out_cuda
+- func: expm1_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _expm1_out_cpu
+    CUDA: _expm1_out_cuda
+- func: lgamma_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _lgamma_out_cpu
+    CUDA: _lgamma_out_cuda
+- func: log1p_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _log1p_out_cpu
+    CUDA: _log1p_out_cuda
+- func: log_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _log_out_cpu
+    CUDA: _log_out_cuda
+- func: sin_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _sin_out_cpu
+    CUDA: _sin_out_cuda
+- func: sinh_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _sinh_out_cpu
+    CUDA: _sinh_out_cuda
+- func: tan_out(Tensor result, Tensor self) -> Tensor
+  variants: function
+  dispatch:
+    CPU: _tan_out_cpu
+    CUDA: _tan_out_cuda
+
 # \Unary Ops #

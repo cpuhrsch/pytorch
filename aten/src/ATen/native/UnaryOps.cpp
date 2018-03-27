@@ -21,6 +21,7 @@ unary_type* roundImpl = DispatchStub<unary_type>::init<roundImplC, &roundImpl>;
 unary_type* truncImpl = DispatchStub<unary_type>::init<truncImplC, &truncImpl>;
 unary_type* sqrtImpl = DispatchStub<unary_type>::init<sqrtImplC, &sqrtImpl>;
 
+
 // WRAP OPS #################################################################
 
 Tensor ceil(const Tensor& self) {
@@ -44,6 +45,8 @@ Tensor sqrt(const Tensor& self) {
   return at::sqrt_out(result, self);
 }
 
+
+
 Tensor& ceil_(Tensor& self) {
   return at::ceil_out(self, self);
 }
@@ -59,6 +62,7 @@ Tensor& trunc_(Tensor& self) {
 Tensor& sqrt_(Tensor& self) {
   return at::sqrt_out(self, self);
 }
+
 
 // \WRAP OPS #################################################################
 
@@ -94,6 +98,7 @@ Tensor& _sqrt_out_cpu(Tensor& result, const Tensor& self) {
                                                 : at::_sqrt_out(result, self);
 }
 
+
 // \CPU OPS #################################################################
 
 // CUDA OPS #################################################################
@@ -114,5 +119,41 @@ Tensor& _sqrt_out_cuda(Tensor& result, const Tensor& self) {
   return at::_sqrt_out(result, self);
 }
 
+
+
 // \CUDA OPS ################################################################
+
+// GENERIC
+#define DISPATCH(NAME, FUNC) \
+unary_type* NAME ## Impl = DispatchStub<unary_type>::init<NAME ## ImplC, &NAME ## Impl>;\
+
+#define BASIC(NAME, FUNC) \
+Tensor NAME(const Tensor& self) { \
+  Tensor result = self.type().tensor(); \
+  return at::NAME ## _out(result, self); \
+} \
+
+#define SELF(NAME, FUNC) \
+Tensor& NAME##_(Tensor& self) { \
+  return at::NAME ## _out(self, self); \
+} \
+
+#define OUTCPU(NAME, FUNC) \
+Tensor& _ ## NAME ## _out_cpu(Tensor& result, const Tensor& self) { \
+  return _unops_out_cpu(NAME ## Impl, result, self) ? result \
+                                                : at::_ ## NAME ## _out(result, self); \
+} \
+
+#define OUTCUDA(NAME, FUNC) \
+Tensor& _ ## NAME ## _out_cuda(Tensor& result, const Tensor& self) { \
+  return at::_ ## NAME ## _out(result, self); \
+} \
+
+UNARY_OPS_MACRO(DISPATCH)
+UNARY_OPS_MACRO(BASIC)
+UNARY_OPS_MACRO(SELF)
+UNARY_OPS_MACRO(OUTCPU)
+UNARY_OPS_MACRO(OUTCUDA)
+
+
 }} // namespace at::native
