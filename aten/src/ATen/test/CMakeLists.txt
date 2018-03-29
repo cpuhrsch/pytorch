@@ -10,6 +10,9 @@ target_link_libraries(scalar_test ATen)
 ADD_EXECUTABLE(basic basic.cpp)
 target_link_libraries(basic ATen)
 
+add_executable(apply_utils_test apply_utils_test.cpp)
+target_link_libraries(apply_utils_test ATen)
+
 add_executable(atest atest.cpp)
 target_link_libraries(atest ATen)
 
