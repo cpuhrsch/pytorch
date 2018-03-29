@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include "ATen/CPUApplyUtils.h"
 #include "ATen/Dispatch.h"
 #include "ATen/Parallel.h"
 #include "ATen/cpu/vec256/vec256.h"
@@ -12,7 +13,8 @@ namespace at { namespace native {
 using namespace vec256;
 
 template <typename scalar_t, typename F>
-static void unary_kernel(scalar_t* arr_out, const scalar_t* arr_in, int64_t size, F func) {
+static void
+unary_kernel(scalar_t* arr_out, const scalar_t* arr_in, int64_t size, F func) {
   using Vec = Vec256<scalar_t>;
   int64_t size_rounded = size - (size % Vec::size);
   int64_t k = 0;
@@ -32,99 +34,96 @@ static void parallel_apply(Tensor& result, const Tensor& self, F f) {
 
   static tbb::affinity_partitioner ap;
 
-  auto arr_out = result.data<scalar_t>();
-  auto arr_in = self.data<scalar_t>();
-  int64_t size = self.numel();
-  if (size < internal::TBB_GRAIN_SIZE) {
-    unary_kernel(arr_out, arr_in, size, f);
+  if (result.is_contiguous() && self.is_contiguous()) {
+    auto arr_out = result.data<scalar_t>();
+    auto arr_in = self.data<scalar_t>();
+    int64_t size = self.numel();
+    if (size < internal::TBB_GRAIN_SIZE) {
+      unary_kernel(arr_out, arr_in, size, f);
+    } else {
+      tbb::parallel_for(
+          tbb::blocked_range<int64_t>(0, size, internal::TBB_GRAIN_SIZE),
+          [&](const tbb::blocked_range<int64_t>& r) {
+            auto size = r.end() - r.begin();
+            unary_kernel(arr_out + r.begin(), arr_in + r.begin(), size, f);
+          },
+          ap);
+    }
   } else {
-    tbb::parallel_for(
-        tbb::blocked_range<int64_t>(0, size, internal::TBB_GRAIN_SIZE),
-        [&](const tbb::blocked_range<int64_t>& r) {
-          auto size = r.end() - r.begin();
-          unary_kernel(arr_out + r.begin(), arr_in + r.begin(), size, f);
-        },
-        ap);
+    CPU_tensor_apply2<scalar_t, scalar_t>(
+        result, self, [f](scalar_t& a_val, const scalar_t& b_val) {
+          unary_kernel(&a_val, &b_val, 1, f);
+        });
   }
 }
 
 static void abs_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_ALL_TYPES(self.type(), "abs", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.abs();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.abs(); });
   });
 }
 
 static void ceil_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "ceil", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.ceil();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.ceil(); });
   });
 }
 
 static void cos_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "cos", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.cos();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.cos(); });
   });
 }
 
 static void exp_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "exp", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.exp();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.exp(); });
   });
 }
 
 static void floor_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "floor", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.floor();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.floor(); });
   });
 }
 
 static void log_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "log", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.log();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.log(); });
   });
 }
 
 static void round_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "round", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.round();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.round(); });
   });
 }
 
 static void sin_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "sin", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.sin();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.sin(); });
   });
 }
 
 static void sqrt_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "sqrt", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.sqrt();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.sqrt(); });
   });
 }
 
 static void trunc_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "trunc", [&] {
-    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
-      return x.trunc();
-    });
+    parallel_apply<scalar_t>(
+        result, self, [](const Vec256<scalar_t>& x) { return x.trunc(); });
   });
 }
 
