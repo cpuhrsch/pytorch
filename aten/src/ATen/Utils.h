@@ -11,6 +11,26 @@
 
 namespace at {
 
+//===----------------------------------------------------------------------===//
+//                std::index_sequence shim for C++11
+//===----------------------------------------------------------------------===//
+
+// A container of type-template parameter indices.
+template<size_t... Is>
+struct Indices {};
+
+// Decrements the index N, adds N-1 to the list of indices and forwards
+// whatever we arleady have.
+template<size_t N, size_t... Is>
+struct MakeIndices : MakeIndices<N-1, N-1, Is...> {};
+
+// Partial specialization that forms our base case. When N is zero, we stop
+// and define a typedef that will be visible to earlier classes due to
+// inheritance. The typedef we define is an index list containing the numbers
+// 0 through N-1.
+template<size_t... Is>
+struct MakeIndices<0, Is...> { using indices = Indices<Is...>; };
+
 template <typename T, typename Base>
 static inline T* checked_cast_storage(Base* expr, const char * name, int pos) {
   if (typeid(*expr) != typeid(T))
