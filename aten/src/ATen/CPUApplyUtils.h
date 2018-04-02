@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <sstream>
 #include <tuple>
 #include "ATen/TensorUtils.h"
@@ -36,19 +37,21 @@ namespace at {
  * reducing the number of nested loops.
  */
 
-
-//TODO:
+// TODO:
 // Write rigorous test for different non-contiguous tensors!
 // I.e. generate a bunch of non-contiguous tensors and feed it into some tests
 
 template <typename T>
-struct util_tensor {
+struct strided_tensor_iter {
   T* data = NULL;
   int64_t *counter = NULL, *sizes = NULL, *strides = NULL, *dimOffset = NULL;
   int64_t stride = 0, size = 0, dim = 0, i, numel;
   int contiguous;
-  util_tensor(Tensor& tensor, int64_t dim, bool ALLOW_CONTIGUOUS) {
-    dim = dim;
+  strided_tensor_iter(strided_tensor_iter const&) = delete;
+  void operator=(strided_tensor_iter const& x) = delete;
+  strided_tensor_iter(strided_tensor_iter&&) = default;
+  strided_tensor_iter(Tensor& tensor, int64_t dim_, bool ALLOW_CONTIGUOUS) {
+    dim = dim_;
     int64_t TH_TENSOR_dim_index = 0;
     int contiguous = ALLOW_CONTIGUOUS && dim < 0;
     numel = tensor.numel();
@@ -102,15 +105,20 @@ struct util_tensor {
     }
     i = 0;
   }
-  ~util_tensor() {
+  ~strided_tensor_iter() {
     if (counter != NULL)
       delete[] counter;
   }
 };
 
+//TODO:
+// Create a rigorous set of test cases
+// Make apply_dim for everywhere by using (*op)(scalars...) instead of Op
+// Land the avx_mathfun PR
+
 // Return true if finished
 template <typename T>
-static bool update(util_tensor<T>& ut) {
+static bool update(strided_tensor_iter<T>& ut) {
   if (ut.i == ut.size) {
     if (ut.contiguous)
       return true;
@@ -166,17 +174,15 @@ inline std::string _all_equal_numel_error(at::ArrayRef<Tensor> tensors) {
     oss << tensors[i].numel() << ", ";
   }
   oss << "and " << tensors[tensors.size() - 1].numel()
-    << " elements respectively";
+      << " elements respectively";
   return oss.str();
 }
 
 template <typename... scalars>
-std::tuple<util_tensor<scalars>...> build_util_tensors(
-    int64_t dim,
-    bool allow_cont,
-    Tensor& tensors...) {
-  return 
-      std::make_tuple(util_tensor<scalars>(tensors, dim, allow_cont)...);
+std::tuple<strided_tensor_iter<scalars>...>
+build_strided_tensor_iters(int64_t dim, bool allow_cont, Tensor& tensors...) {
+  return std::make_tuple(
+      strided_tensor_iter<scalars>(tensors, dim, allow_cont)...);
 }
 
 template <std::size_t I = 0, typename... Tp>
@@ -198,7 +204,8 @@ inline typename std::enable_if<I == sizeof...(Tp), void>::type iterate_all(
 template <std::size_t I = 0, typename... Tp>
     inline typename std::enable_if <
     I<sizeof...(Tp), void>::type iterate_all(std::tuple<Tp...>& t) {
-  auto ut = std::get<I>(t);
+  auto& ut = std::get<I>(t);
+  ut.i = ut.i + 1;
   ut.data += ut.stride;
   iterate_all<I + 1, Tp...>(t);
 }
@@ -212,15 +219,12 @@ inline typename std::enable_if<I == sizeof...(Tp), bool>::type check_all(
 template <std::size_t I = 0, typename... Tp>
     inline typename std::enable_if <
     I<sizeof...(Tp), bool>::type check_all(std::tuple<Tp...>& t) {
-  auto ut = std::get<I>(t);
+  auto& ut = std::get<I>(t);
   return ut.i < ut.size && check_all<I + 1, Tp...>(t);
 }
 
 inline bool _apply_preamble(ArrayRef<Tensor> tensors) {
-  checkBackend(
-      "CPU_tensor_apply",
-      tensors,
-      Backend::CPU);
+  checkBackend("CPU_tensor_apply", tensors, Backend::CPU);
   if (!_all_equal_numel(tensors))
     throw std::runtime_error(_all_equal_numel_error(tensors));
   for (auto& t : tensors)
@@ -229,33 +233,29 @@ inline bool _apply_preamble(ArrayRef<Tensor> tensors) {
   return true;
 }
 
-
-template <typename Op, typename... scalars, size_t... Is> 
-void _apply_op(Op op, std::tuple<util_tensor<scalars>...> t, Indices<Is...>) {
+template <typename Op, typename... scalars, size_t... Is>
+void _apply_op(
+    Op op,
+    std::tuple<strided_tensor_iter<scalars>...>& t,
+    Indices<Is...>) {
+  while (check_all(t)) {
     op(*std::get<Is>(t).data...);
-    }   
-
-template <typename Op, typename... scalars>
-void apply_op(Op op, std::tuple<util_tensor<scalars>...> t) {
-    _apply_op(op, t, typename MakeIndices<sizeof... (scalars)>::indices());
+    iterate_all(t);
+  }
 }
 
 template <typename Op, typename... scalars>
-void CPU_tensor_apply_dim(
-    int64_t dim,
-    Op op,
-    Tensor& tensors...) {
+void apply_op(Op op, std::tuple<strided_tensor_iter<scalars>...>& t) {
+  _apply_op(op, t, typename MakeIndices<sizeof...(scalars)>::indices());
+}
+
+template <typename Op, typename... scalars>
+void CPU_tensor_apply_dim(int64_t dim, Op op, Tensor& tensors...) {
   if (!_apply_preamble({tensors}))
     return;
-  auto uts = build_util_tensors<scalars...>(dim, true, tensors);
-  while (true) {
-    while (check_all(uts)) {
-      apply_op(op, uts);
-      iterate_all(uts);
-    }
-    if (update_all(uts))
-      break;
-  }
+  auto uts = build_strided_tensor_iters<scalars...>(dim, true, tensors);
+  while (update_all(uts))
+    apply_op(op, uts);
 }
 
 template <typename Op, typename... scalars>

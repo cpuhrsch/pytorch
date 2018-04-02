@@ -245,6 +245,8 @@ class TestTorch(TestCase):
             res2 = res1.clone().zero_()
             for i, v in enumerate(m1[:, 4]):
                 res2[i] = mathfn(v.item())
+            print(res1)
+            print(res2)
             self.assertEqual(res1, res2, prec)
 
         _testMathSize((10, 5), self, torchfn, mathfn, torch.double, precs[0])
