@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sstream>
+#include <tuple>
 #include "ATen/TensorUtils.h"
 
 namespace at {
@@ -142,34 +143,193 @@ static bool update(util_tensor<T>& ut) {
   return false;
 }
 
-template <typename scalar1, typename scalar2, typename Op>
+inline bool _all_equal_numel(at::ArrayRef<Tensor> tensors) {
+  if (tensors.size() == 0)
+    return true;
+  int64_t all_numel = tensors[0].numel();
+  for (size_t i = 1; i < tensors.size(); i++) {
+    if (tensors[i].numel() != all_numel)
+      return false;
+  }
+  return true;
+}
+
+inline std::string _all_equal_numel_error(at::ArrayRef<Tensor> tensors) {
+  std::ostringstream oss;
+  oss << "inconsistent tensor size, expected ";
+  for (size_t i = 0; i < tensors.size() - 1; i++) {
+    oss << tensors[i].sizes() << ", ";
+  }
+  oss << "and " << tensors[tensors.size() - 1]
+      << " to have the same number of elements, but got ";
+  for (size_t i = 0; i < tensors.size() - 1; i++) {
+    oss << tensors[i].numel() << ", ";
+  }
+  oss << "and " << tensors[tensors.size() - 1].numel()
+    << " elements respectively";
+  return oss.str();
+}
+
+template <typename... scalars>
+std::tuple<util_tensor<scalars>...> build_util_tensors(
+    int64_t dim,
+    bool allow_cont,
+    Tensor& tensors...) {
+  return 
+      std::make_tuple(util_tensor<scalars>(tensors, dim, allow_cont)...);
+}
+
+template <std::size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), bool>::type update_all(
+    std::tuple<Tp...>& t) {
+  return false;
+}
+
+template <std::size_t I = 0, typename... Tp>
+    inline typename std::enable_if <
+    I<sizeof...(Tp), bool>::type update_all(std::tuple<Tp...>& t) {
+  return update(std::get<I>(t)) || update_all<I + 1, Tp...>(t);
+}
+
+template <std::size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type iterate_all(
+    std::tuple<Tp...>& t) {}
+
+template <std::size_t I = 0, typename... Tp>
+    inline typename std::enable_if <
+    I<sizeof...(Tp), void>::type iterate_all(std::tuple<Tp...>& t) {
+  auto ut = std::get<I>(t);
+  ut.data += ut.stride;
+  iterate_all<I + 1, Tp...>(t);
+}
+
+template <std::size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), bool>::type check_all(
+    std::tuple<Tp...>& t) {
+  return true;
+}
+
+template <std::size_t I = 0, typename... Tp>
+    inline typename std::enable_if <
+    I<sizeof...(Tp), bool>::type check_all(std::tuple<Tp...>& t) {
+  auto ut = std::get<I>(t);
+  return ut.i < ut.size && check_all<I + 1, Tp...>(t);
+}
+
+inline bool _apply_preamble(ArrayRef<Tensor> tensors) {
+  checkBackend(
+      "CPU_tensor_apply",
+      tensors,
+      Backend::CPU);
+  if (!_all_equal_numel(tensors))
+    throw std::runtime_error(_all_equal_numel_error(tensors));
+  for (auto& t : tensors)
+    if (t.sizes().equals({0}))
+      return false;
+  return true;
+}
+
+// Represents a compile-time sequence of integers.
+// T is the integer type of the sequence, can be size_t, int.
+// I is a parameter pack representing the sequence.
+template <class T, T... I> struct integer_sequence {
+ typedef T value_type;
+
+ static constexpr size_t size() { return sizeof...(I); }
+};
+
+// Alias for the common case of a sequence of size_t.
+// A pre-defined sequence for common use case.
+template <std::size_t... I>
+struct index_sequence : integer_sequence<std::size_t, I...> {}; 
+
+template <std::size_t N, std::size_t... I>
+struct build_index_impl : build_index_impl<N - 1, N - 1, I...> {}; 
+template <std::size_t... I>
+struct build_index_impl<0, I...> : index_sequence<I...> {}; 
+
+// Creates a compile-time integer sequence for a parameter pack.
+template <class... Ts> 
+struct index_sequence_for : build_index_impl<sizeof...(Ts)> {}; 
+
+template <typename Op, typename... scalars, size_t... Is> 
+void _apply_op(Op op, std::tuple<util_tensor<scalars>...> t, index_sequence<Is...>) {
+    op(*std::get<Is>(t).data...);
+    }   
+
+template <typename Op, typename... scalars>
+void apply_op(Op op, std::tuple<util_tensor<scalars>...> t) {
+    _apply_op(op, t, index_sequence_for<scalars...>());
+}
+
+template <typename Op, typename... scalars>
 void CPU_tensor_apply2_dim(
+    int64_t dim,
+    Op op,
+    Tensor& tensors...) {
+  if (!_apply_preamble({tensors}))
+    return;
+  auto uts = build_util_tensors<scalars...>(dim, true, tensors);
+  while (true) {
+    while (check_all(uts)) {
+      apply_op(op, uts);
+      iterate_all(uts);
+    }
+    if (update_all(uts))
+      break;
+  }
+}
+
+template <typename scalar1, typename scalar2, typename scalar3, typename Op>
+void CPU_tensor_apply3_dim(
     Tensor& tensor1,
     Tensor& tensor2,
+    Tensor& tensor3,
     int64_t dim,
     Op op) {
-  checkBackend("CPU_tensor_apply2", {tensor1, tensor2}, Backend::CPU);
-  if (tensor1.numel() != tensor2.numel()) {
-    std::ostringstream oss;
-    oss << "inconsistent tensor size, expected " 
-        << tensor1.sizes() << ", and "
-        << tensor2.sizes() << " to have the same number of elements, but got "
-        << tensor1.numel() << ", and "
-        << tensor2.numel() << " elements respectively";
-    throw std::runtime_error(oss.str());
-  }
-  if (tensor1.sizes().equals({0})) return;
-  if (tensor2.sizes().equals({0})) return;
-  util_tensor<scalar1> ut1(tensor1, dim, true);
-  util_tensor<scalar2> ut2(tensor2, dim, true);
+  if (!_apply_preamble({tensor1, tensor2, tensor3}))
+    return;
+  auto uts = build_util_tensors<scalar1, scalar2, scalar3>(
+      dim, true, tensor1, tensor2, tensor3);
   while (true) {
-    /* Loop through the inner most region of the Tensor */
-    for (; ut1.i < ut1.size && ut2.i < ut2.size;
-         ut1.i++, ut2.i++, ut1.data += ut1.stride, ut2.data += ut2.stride) {
-      op(*ut1.data, *ut2.data);
+    while (check_all(uts)) {
+      op(*std::get<0>(uts).data,
+         *std::get<1>(uts).data,
+         *std::get<2>(uts).data);
+      iterate_all(uts);
     }
-    if (update(ut1)) break;
-    if (update(ut2)) break;
+    if (update_all(uts))
+      break;
+  }
+}
+
+template <
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename Op>
+void CPU_tensor_apply4_dim(
+    Tensor& tensor1,
+    Tensor& tensor2,
+    Tensor& tensor3,
+    Tensor& tensor4,
+    int64_t dim,
+    Op op) {
+  if (!_apply_preamble({tensor1, tensor2, tensor3, tensor4}))
+    return;
+  auto uts = build_util_tensors<scalar1, scalar2, scalar3, scalar4>(
+      dim, true, tensor1, tensor2, tensor3, tensor4);
+  while (true) {
+    while (check_all(uts)) {
+      op(*std::get<0>(uts).data,
+         *std::get<1>(uts).data,
+         *std::get<2>(uts).data,
+         *std::get<3>(uts).data);
+      iterate_all(uts);
+    }
+    if (update_all(uts))
+      break;
   }
 }
 
@@ -184,52 +344,7 @@ void CPU_tensor_apply2_dim(
 */
 template <typename scalar1, typename scalar2, typename Op>
 void CPU_tensor_apply2(Tensor tensor1, Tensor tensor2, Op op) {
-  CPU_tensor_apply2_dim<scalar1, scalar2, Op>(tensor1, tensor2, -1, op);
-}
-
-template <typename scalar1, typename scalar2, typename scalar3, typename Op>
-void CPU_tensor_apply3_dim(
-    Tensor& tensor1,
-    Tensor& tensor2,
-    Tensor& tensor3,
-    int64_t dim,
-    Op op) {
-  checkBackend("CPU_tensor_apply3", {tensor1, tensor2, tensor3}, Backend::CPU);
-
-  if (!(tensor1.numel() == tensor2.numel() &&
-        tensor2.numel() == tensor3.numel())) {
-    std::ostringstream oss;
-    oss << "inconsistent tensor size, expected " 
-        << tensor1.sizes() << ", "
-        << tensor2.sizes() << ", and "
-        << tensor3.sizes() << " to have the same number of elements, but got "
-        << tensor1.numel() << ", " 
-        << tensor2.numel() << ", and "
-        << tensor3.numel() << " elements respectively";
-    throw std::runtime_error(oss.str());
-  }
-  if (tensor1.sizes().equals({0})) return;
-  if (tensor2.sizes().equals({0})) return;
-  if (tensor3.sizes().equals({0})) return;
-
-  util_tensor<scalar1> ut1(tensor1, dim, true);
-  util_tensor<scalar2> ut2(tensor2, dim, true);
-  util_tensor<scalar3> ut3(tensor3, dim, true);
-  while (true) {
-    /* Loop through the inner most region of the Tensor */
-    for (; ut1.i < ut1.size && ut2.i < ut2.size && ut3.i < ut3.size;
-         ut1.i++,
-         ut2.i++,
-         ut3.i++,
-         ut1.data += ut1.stride,
-         ut2.data += ut2.stride,
-         ut3.data += ut3.stride) {
-      op(*ut1.data, *ut2.data, *ut3.data);
-    }
-    if (update(ut1)) break;
-    if (update(ut2)) break;
-    if (update(ut3)) break;
-  }
+  CPU_tensor_apply2_dim<Op, scalar1, scalar2>(-1, op, tensor1, tensor2);
 }
 
 /*
@@ -246,67 +361,6 @@ template <typename scalar1, typename scalar2, typename scalar3, typename Op>
 void CPU_tensor_apply3(Tensor tensor1, Tensor tensor2, Tensor tensor3, Op op) {
   CPU_tensor_apply3_dim<scalar1, scalar2, scalar3, Op>(
       tensor1, tensor2, tensor3, -1, op);
-}
-
-template <
-    typename scalar1,
-    typename scalar2,
-    typename scalar3,
-    typename scalar4,
-    typename Op>
-void CPU_tensor_apply4_dim(
-    Tensor& tensor1,
-    Tensor& tensor2,
-    Tensor& tensor3,
-    Tensor& tensor4,
-    int64_t dim,
-    Op op) {
-  checkBackend(
-      "CPU_tensor_apply4", {tensor1, tensor2, tensor3, tensor4}, Backend::CPU);
-
-  if (!(tensor1.numel() == tensor2.numel() &&
-        tensor2.numel() == tensor3.numel() &&
-        tensor3.numel() == tensor4.numel())) {
-    std::ostringstream oss;
-    oss << "inconsistent tensor size, expected " 
-        << tensor1.sizes() << ", "
-        << tensor2.sizes() << ", " 
-        << tensor3.sizes() << ", and "
-        << tensor4.sizes() << " to have the same number of elements, but got "
-        << tensor1.numel() << ", " 
-        << tensor2.numel() << ", " 
-        << tensor3.numel() << ", and "
-        << tensor4.numel() << " elements respectively";
-    throw std::runtime_error(oss.str());
-  }
-  if (tensor1.sizes().equals({0})) return;
-  if (tensor2.sizes().equals({0})) return;
-  if (tensor3.sizes().equals({0})) return;
-  if (tensor4.sizes().equals({0})) return;
-
-  util_tensor<scalar1> ut1(tensor1, dim, true);
-  util_tensor<scalar2> ut2(tensor2, dim, true);
-  util_tensor<scalar3> ut3(tensor3, dim, true);
-  util_tensor<scalar4> ut4(tensor4, dim, true);
-  while (true) {
-    /* Loop through the inner most region of the Tensor */
-    for (; ut1.i < ut1.size && ut2.i < ut2.size && ut3.i < ut3.size &&
-         ut4.i < ut4.size;
-         ut1.i++,
-         ut2.i++,
-         ut3.i++,
-         ut4.i++,
-         ut1.data += ut1.stride,
-         ut2.data += ut2.stride,
-         ut3.data += ut3.stride,
-         ut4.data += ut4.stride) {
-      op(*ut1.data, *ut2.data, *ut3.data, *ut4.data);
-    }
-    if (update(ut1)) break;
-    if (update(ut2)) break;
-    if (update(ut3)) break;
-    if (update(ut4)) break;
-  }
 }
 
 /*
