@@ -39,21 +39,32 @@ namespace at {
  * reducing the number of nested loops.
  */
 
-template <typename T, int N>
-struct strided_tensor_iter_fixed {
+template <typename T>
+struct strided_tensor_iter {
  public:
   T* data_ = NULL;
   int64_t dim_;
 
-  int64_t counter_[N];
-  int64_t sizes_[N];
-  int64_t strides_[N];
+  SmallVector<int64_t, 8> counter_;
+  SmallVector<int64_t, 8> sizes_;
+  SmallVector<int64_t, 8> strides_;
 
-  strided_tensor_iter_fixed(strided_tensor_iter_fixed const&) = delete;
-  void operator=(strided_tensor_iter_fixed const& x) = delete;
-  strided_tensor_iter_fixed(strided_tensor_iter_fixed&&) = default;
-  strided_tensor_iter_fixed(Tensor& tensor) : data_(tensor.data<T>()), dim_(0) {
+
+  strided_tensor_iter(strided_tensor_iter const&) = delete;
+  void operator=(strided_tensor_iter const& x) = delete;
+  strided_tensor_iter(strided_tensor_iter&&) = default;
+  strided_tensor_iter(Tensor& tensor)
+      : data_(tensor.data<T>()),
+        dim_(0),
+        counter_(8, 0),
+        sizes_(8, 0),
+        strides_(8, 0) {
     int64_t max_dim = tensor.ndimension();
+    if (max_dim > 8) {
+      counter_.resize(max_dim);
+      sizes_.resize(max_dim);
+      strides_.resize(max_dim);
+    }
     dim_ = 0;
     for (int64_t i = 0; i < max_dim; i++) {
       int64_t size = tensor.size(i);
@@ -70,28 +81,6 @@ struct strided_tensor_iter_fixed {
       dim_++;
     }
   }
-};
-
-template <typename T>
-struct strided_tensor_iter {
- private:
- public:
-  T* data_ = NULL;
-  const int64_t dim_;
-
-  std::vector<int64_t> counter_;
-  std::vector<int64_t> sizes_;
-  std::vector<int64_t> strides_;
-
-  strided_tensor_iter(strided_tensor_iter const&) = delete;
-  void operator=(strided_tensor_iter const& x) = delete;
-  strided_tensor_iter(strided_tensor_iter&&) = default;
-  strided_tensor_iter(Tensor& tensor)
-      : data_(tensor.data<T>()),
-        dim_(tensor.ndimension()),
-        counter_(dim_, 0),
-        sizes_(tensor.sizes()),
-        strides_(tensor.strides()) {}
 };
 
 template <typename Arg>
@@ -208,19 +197,11 @@ template <typename scalar1, typename scalar2, typename Op>
 void CPU_tensor_apply2(Tensor tensor1, Tensor tensor2, Op op) {
   if (!_apply_preamble({tensor1, tensor2}))
     return;
-  if (tensor1.ndimension() < 8 && tensor2.ndimension() < 8) {
-    apply_op(
-        tensor1.numel(),
-        op,
-        strided_tensor_iter_fixed<scalar1, 8>(tensor1),
-        strided_tensor_iter_fixed<scalar2, 8>(tensor2));
-  } else {
-    apply_op(
-        tensor1.numel(),
-        op,
-        strided_tensor_iter<scalar1>(tensor1),
-        strided_tensor_iter<scalar2>(tensor2));
-  }
+  apply_op(
+      tensor1.numel(),
+      op,
+      strided_tensor_iter<scalar1>(tensor1),
+      strided_tensor_iter<scalar2>(tensor2));
 }
 
 template <typename scalar1, typename scalar2, typename scalar3, typename Op>
