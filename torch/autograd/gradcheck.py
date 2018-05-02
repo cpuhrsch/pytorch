@@ -185,6 +185,25 @@ def gradcheck(func, inputs, eps=1e-6, atol=1e-5, rtol=1e-3, raise_exception=True
         if not correct_grad_sizes:
             return fail_test('Analytical gradient has incorrect size')
 
+        # print(analytical)
+        # print(numerical)
+        # __size = numerical[0].size()
+        # print(__size)
+        # for i in range(__size[0]):
+        #     for j in range(__size[1]):
+        #         if (analytical[0][i][j] - numerical[0][i][j]).abs() > (atol + rtol * numerical[0][i][j].abs()):
+        #             print((i, j))
+        #             print(analytical[0][i][j])
+        #             print(analytical[0][i][j].type())
+        #             print(numerical[0][i][j])
+        #             print(numerical[0][i][j].type())
+        #             print("atol: " + str(atol))
+        #             print("rtol: " + str(rtol))
+        #             print("abs")
+        #             print((analytical[0][i][j] - numerical[0][i][j]).abs())
+        #             print("abs rel")
+        #             print(atol + rtol * numerical[0][i][j].abs())
+        #             import sys; sys.exit(1)
         for j, (a, n) in enumerate(zip(analytical, numerical)):
             if a.numel() != 0 or n.numel() != 0:
                 if not ((a - n).abs() <= (atol + rtol * n.abs())).all():

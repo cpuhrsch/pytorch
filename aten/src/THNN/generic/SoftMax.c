@@ -15,6 +15,7 @@ void THNN_(SoftMax_updateOutput)(
           THTensor *input,
           THTensor *output,
           int64_t dim) {
+  printf("THNNSOFTMAXOUTPUT\n");
   THArgCheck(dim >= 0 && dim < input->nDimension, 4,
 	     "dim out of range (got %d, but input has %d dims)", dim, input->nDimension);
 
@@ -73,6 +74,7 @@ void THNN_(SoftMax_updateGradInput)(
           THTensor *output,
           int64_t dim)
 {
+  printf("THNNSOFTMAXGRAD\n");
   THNN_CHECK_SHAPE(output, gradOutput);
   THArgCheck(dim >= 0 && dim < output->nDimension, 6,
 	     "dim out of range (got %d, but input has %d dims)", dim, output->nDimension);
