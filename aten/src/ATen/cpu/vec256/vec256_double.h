@@ -153,6 +153,11 @@ Vec256<double> inline max(const Vec256<double>& a, const Vec256<double>& b) {
   return _mm256_max_pd(a, b);
 }
 
+template <>
+Vec256<double> inline min(const Vec256<double>& a, const Vec256<double>& b) {
+  return _mm256_min_pd(a, b);
+}
+
 #endif
 
 }}}

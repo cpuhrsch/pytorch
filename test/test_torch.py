@@ -761,6 +761,14 @@ class TestTorch(TestCase):
             y = cast(torch.randn(5, 3))
             fn(y, 1, keepdim=False, out=x[:, 1])
             expected = fn(y, 1, keepdim=False)
+            print("x")
+            print(x)
+            print("y")
+            print(y)
+            print("a")
+            print(x[:, 1])
+            print("b")
+            print(expected)
             self.assertEqual(x[:, 1], expected, '{} with out= kwarg'.format(fn_name))
 
     def test_dim_reduction(self):

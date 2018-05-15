@@ -177,4 +177,12 @@ template <class T> Vec256<T> max(const Vec256<T> &a, const Vec256<T> &b) {
   return c;
 }
 
+template <class T> Vec256<T> min(const Vec256<T> &a, const Vec256<T> &b) {
+  Vec256<T> c = Vec256<T>();
+  for (int i = 0; i != Vec256<T>::size; i++) {
+    c.values[i] = std::min(a.values[i], b.values[i]);
+  }
+  return c;
+}
+
 }}}

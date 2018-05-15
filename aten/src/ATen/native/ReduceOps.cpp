@@ -126,29 +126,18 @@ Tensor _prod_cpu(const Tensor &self) {
 
 // DIM REDUCE #################################################################
 
-static bool _dimreduce_return_trivial(Tensor &result, const Tensor &self,
-                                      int64_t ident) {
-  if (self.numel() == 1 && self.ndimension() == 0) {
-    result.resize_({});
-    result.fill_(self);
-    return true;
-  }
-  // Return identity
-  if (self.numel() == 0 && self.ndimension() == 1) {
-    result.resize_({0});
-    result.fill_(ident);
-    return true;
-  }
-  return false;
-}
-
 static Tensor &_dimreduce_setup(Tensor &result, const Tensor &self,
                                 int64_t dim) {
   IntList self_sizes = self.sizes();
-  std::vector<int64_t> result_sizes;
-  result_sizes.insert(result_sizes.end(), self_sizes.begin(), self_sizes.end());
-  result_sizes[dim] = 1;
-  result.resize_(result_sizes);
+  if (self.dim() > 0) {
+    std::vector<int64_t> result_sizes;
+    result_sizes.insert(
+        result_sizes.end(), self_sizes.begin(), self_sizes.end());
+    result_sizes[dim] = 1;
+    result.resize_(result_sizes);
+  } else {
+    result.resize_(self.sizes());
+  }
   return result;
 }
 
@@ -172,13 +161,14 @@ Tensor& sum_out(Tensor& result, const Tensor& self, IntList dim, ScalarType dtyp
   return at::native::sum_out(result, self, dim, false, dtype);
 }
 
-Tensor &_sum_out_cpu(Tensor &result, const Tensor &self, int64_t dim_,
+Tensor &_sum_out_cpu(Tensor &result, const Tensor &self_, int64_t dim_,
                      bool keepdim) {
-  int64_t dim = maybe_wrap_dim(dim_, self.dim());
-  if (_dimreduce_return_trivial(result, self, 0))
-    return result;
+  int64_t dim = maybe_wrap_dim(dim_, self_.dim());
+  Tensor self = self_;
+  _dimreduce_setup(result, self, dim);
+  if (self_.dim() == 0)
+    self = self_.view(1);
   if (self.is_contiguous() && result.is_contiguous()) {
-    _dimreduce_setup(result, self, dim);
     sum_kernel(result, self, dim);
     if (!keepdim) result.squeeze_(dim);
     return result;
@@ -206,17 +196,20 @@ Tensor& prod_out(Tensor& result, const Tensor& self, int64_t dim, ScalarType dty
   return at::native::prod_out(result, self, dim, false, dtype);
 }
 
+// TODO: Fix this
 Tensor &_prod_out_cpu(Tensor &result, const Tensor &self, int64_t dim_,
                       bool keepdim) {
   int64_t dim = maybe_wrap_dim(dim_, self.dim());
-  if (_dimreduce_return_trivial(result, self, 1))
-    return result;
-  if (self.is_contiguous() && result.is_contiguous()) {
-    _dimreduce_setup(result, self, dim);
-    prod_kernel(result, self, dim);
-    if (!keepdim) result.squeeze_(dim);
-    return result;
-  }
+//  if (self.is_contiguous() && result.is_contiguous()) {
+//    //  Tensor self = self_;
+//    ////  _dimreduce_setup(result, self, dim);
+//    ////  if (self_.dim() == 0)
+//    ////    self = self_.view(1);
+//    prod_kernel(result, self, dim);
+//    if (!keepdim)
+//      result.squeeze_(dim);
+//    return result;
+//  }
   return at::_th_prod_out(result, self, dim, keepdim);
 }
 
@@ -327,7 +320,6 @@ inline Tensor& reduce_multi_associative_out(Tensor &result, const Tensor &self, 
   return result;
 }
 
-
 Tensor& _sum_out(Tensor &result, const Tensor &self, int64_t dim, bool keepdim) {
   if (self.is_cuda()) {
     return at::_sum_cuda_out(result, self, dim, keepdim);
@@ -344,6 +336,84 @@ Tensor _sum(const Tensor &self, IntList dims, bool keepdim) {
 Tensor& _sum_out(Tensor &result, const Tensor &self, IntList dims, bool keepdim)
 {
   return reduce_multi_associative_out<_sum, _sum_out>(result, self, dims, keepdim);
+}
+
+// \MULTI DIM REDUCE ###########################################################
+
+// \IN PROGRESS ################################################################
+
+// TODO: max_values and min_values should eventually be a case of
+// at::native:max at::native:max should only return the max values as a single
+// Tensor in contrast to torch.max which returns a tuple of max values and the
+// corresponding indices. It is much more common for users to ignore the
+// returned indicies than use them. Legacy behavior at a Python level will be
+// preserved by switching torch.max to calling aten's argmax and an inplace
+// premute. The Python legacy behavior will eventually be deprecated and
+// disabled by default. It will still be accessible via a flag
+// "return_indicies". ATen should only implement a fused version of max and
+// argmax if there is demand and an actual performance gain.
+
+Tensor max_values(const Tensor& self_, int64_t dim_, bool keepdim) {
+  int64_t dim = maybe_wrap_dim(dim_, self_.dim());
+  Tensor self = self_;
+  Tensor result = self.type().tensor({});
+  _dimreduce_setup(result, self, dim);
+  if (self_.dim() == 0)
+    self = self_.view(1);
+  if (self.is_contiguous() && !self.is_cuda()) {
+    max_kernel(result, self, dim);
+    if (!keepdim)
+      result.squeeze_(dim);
+    return result;
+  }
+  return std::get<0>(self.max(dim, keepdim));
+}
+
+Tensor min_values(const Tensor& self_, int64_t dim_, bool keepdim) {
+  int64_t dim = maybe_wrap_dim(dim_, self_.dim());
+  Tensor self = self_;
+  Tensor result = self.type().tensor({});
+  _dimreduce_setup(result, self, dim);
+  if (self_.dim() == 0)
+    self = self_.view(1);
+  if (self.is_contiguous() && !self.is_cuda()) {
+    min_kernel(result, self, dim);
+    if (!keepdim)
+      result.squeeze_(dim);
+    return result;
+  }
+  return std::get<0>(self.min(dim, keepdim));
+}
+
+// argmax and argmin
+
+Tensor argmax(const Tensor& self, int64_t dim, bool keepdim) {
+  return std::get<1>(self.max(dim, keepdim));
+}
+
+Tensor argmax(const Tensor& self) {
+  return std::get<1>(self.reshape({-1}).max(/*dim=*/0));
+}
+
+Tensor argmin(const Tensor& self, int64_t dim, bool keepdim) {
+  return std::get<1>(self.min(dim, keepdim));
+}
+
+Tensor argmin(const Tensor& self) {
+  return std::get<1>(self.reshape({-1}).min(/*dim=*/0));
+}
+
+// `argmin` and `argmax` are exposed in C++ but not in Python, where we only
+// expose `_argmin` and `_argmax` (which call the first versions). In Python,
+// we then define our own `argmax` and `argmin` that handle passing `dim=None`,
+// which gets the argmax/argmin of the flattened array.
+
+Tensor _argmax(const Tensor& self, int64_t dim, bool keepdim) {
+  return at::argmax(self, dim, keepdim);
+}
+
+Tensor _argmin(const Tensor& self, int64_t dim, bool keepdim) {
+  return at::argmin(self, dim, keepdim);
 }
 
 }} // namespace at::native
