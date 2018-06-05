@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
-#include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
+#include <ATen/NativeFunctions.h>
 #include <ATen/cuda/CUDAConfig.h>
 
 #if !AT_CUDNN_ENABLED()
@@ -9,15 +9,17 @@ namespace at { namespace native {
 
 // See Note [ATen preprocessor philosophy]
 
-Tensor cudnn_grid_sampler_forward(
-    const Tensor& input_t, const Tensor& grid_t) {
-  throw std::runtime_error("cudnn_grid_sampler_forward: ATen not compiled with cuDNN support");
+Tensor cudnn_grid_sampler_forward(const Tensor& input_t, const Tensor& grid_t) {
+  throw std::runtime_error(
+      "cudnn_grid_sampler_forward: ATen not compiled with cuDNN support");
 }
 
 std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
-    const Tensor& input_t, const Tensor& grid_t,
+    const Tensor& input_t,
+    const Tensor& grid_t,
     const Tensor& grad_output_t) {
-  throw std::runtime_error("cudnn_grid_sampler_backward: ATen not compiled with cuDNN support");
+  throw std::runtime_error(
+      "cudnn_grid_sampler_backward: ATen not compiled with cuDNN support");
 }
 
 }}
@@ -32,22 +34,22 @@ std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
 
 // TODO: descriptor checking
 
-
 namespace at { namespace native {
 
 namespace {
 
-void setSamplerDescriptor(SpatialTransformerDescriptor& desc, cudnnDataType_t dataType, const at::Tensor& tensor)
-{
+void setSamplerDescriptor(
+    SpatialTransformerDescriptor& desc,
+    cudnnDataType_t dataType,
+    const at::Tensor& tensor) {
   int inputSize[4] = {0};
   for (int i = 0; i < tensor.dim(); ++i) {
-    inputSize[i] = (int) tensor.size(i);
+    inputSize[i] = (int)tensor.size(i);
   }
   desc.set(dataType, 4, inputSize);
 }
 
-void checkGridSize(CheckedFrom c, TensorArg grid, TensorArg input)
-{
+void checkGridSize(CheckedFrom c, TensorArg grid, TensorArg input) {
   // assert size of grid is n*h*w*2
   // FYI: grid is between [-1, 1], where -1 left most pixel,
   // 1 represents right most pixel (and hence 0 is the center pixel)
@@ -60,13 +62,11 @@ void checkGridSize(CheckedFrom c, TensorArg grid, TensorArg input)
   checkSize(c, grid, 3, 2);
 }
 
-}  // namespace
+} // namespace
 
-Tensor cudnn_grid_sampler_forward(
-    const Tensor& input_t, const Tensor& grid_t)
-{
-  TensorArg input{ contiguousIfZeroInStrides(input_t), "input", 1 },
-            grid{ grid_t.contiguous(), "grid", 2 };
+Tensor cudnn_grid_sampler_forward(const Tensor& input_t, const Tensor& grid_t) {
+  TensorArg input{contiguousIfZeroInStrides(input_t), "input", 1},
+      grid{grid_t.contiguous(), "grid", 2};
   CheckedFrom c = "cudnn_grid_sampler_forward";
   setCuDNNStreamToCurrent();
   checkAllSameGPU(c, {input, grid});
@@ -75,10 +75,11 @@ Tensor cudnn_grid_sampler_forward(
   checkDim(c, input, 4);
 
   auto output_t = input->type().tensor();
-  output_t.resize_({input->size(0), input->size(1), grid->size(1), grid->size(2)});
+  output_t.resize_(
+      {input->size(0), input->size(1), grid->size(1), grid->size(2)});
 
-  TensorDescriptor idesc{ *input };  // input descriptor
-  TensorDescriptor odesc{ output_t };  // output descriptor
+  TensorDescriptor idesc{*input}; // input descriptor
+  TensorDescriptor odesc{output_t}; // output descriptor
   SpatialTransformerDescriptor desc; // sampler descriptor
 
   auto handle = getCudnnHandle();
@@ -88,11 +89,15 @@ Tensor cudnn_grid_sampler_forward(
   Constant one(dataType, 1);
   Constant zero(dataType, 0);
   CUDNN_CHECK(cudnnSpatialTfSamplerForward(
-      handle, desc.desc(),
-      &one, idesc.desc(), input->data_ptr(),
+      handle,
+      desc.desc(),
+      &one,
+      idesc.desc(),
+      input->data_ptr(),
       grid->data_ptr(),
-      &zero, odesc.desc(), output_t.data_ptr()
-  ));
+      &zero,
+      odesc.desc(),
+      output_t.data_ptr()));
 
   return output_t;
 }
@@ -100,12 +105,12 @@ Tensor cudnn_grid_sampler_forward(
 // NB: CuDNN does not support output mask; you always get both
 // gradients.
 std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
-    const Tensor& input_t, const Tensor& grid_t,
-    const Tensor& grad_output_t)
-{
-  TensorArg input{ contiguousIfZeroInStrides(input_t), "input", 1 },
-            grid{ grid_t.contiguous(), "grid", 2 },
-            grad_output{ contiguousIfZeroInStrides(grad_output_t), "grad_output", 3 };
+    const Tensor& input_t,
+    const Tensor& grid_t,
+    const Tensor& grad_output_t) {
+  TensorArg input{contiguousIfZeroInStrides(input_t), "input", 1},
+      grid{grid_t.contiguous(), "grid", 2},
+      grad_output{contiguousIfZeroInStrides(grad_output_t), "grad_output", 3};
   CheckedFrom c = "cudnn_grid_sampler_backward";
   setCuDNNStreamToCurrent();
   checkAllSameGPU(c, {input, grad_output, grid});
@@ -118,9 +123,9 @@ std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
   auto grad_grid_t = grid->type().tensor();
   grad_grid_t.resize_(grid->sizes());
 
-  TensorDescriptor idesc{ *input };  // input descriptor
-  TensorDescriptor odesc{ *grad_output };  // grad_output descriptor
-  TensorDescriptor gdesc{ grad_input_t };  // grad_input descriptor
+  TensorDescriptor idesc{*input}; // input descriptor
+  TensorDescriptor odesc{*grad_output}; // grad_output descriptor
+  TensorDescriptor gdesc{grad_input_t}; // grad_input descriptor
   SpatialTransformerDescriptor desc; // sampler descriptor
 
   auto handle = getCudnnHandle();
@@ -130,18 +135,25 @@ std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
   Constant one(dataType, 1);
   Constant zero(dataType, 0);
   CUDNN_CHECK(cudnnSpatialTfSamplerBackward(
-    handle, desc.desc(),
-    &one, idesc.desc(), input->data_ptr(),
-    &zero, gdesc.desc(), grad_input_t.data_ptr(),
-    &one, odesc.desc(), grad_output->data_ptr(),
-    // intruigingly, the outputs don't need descriptors
-    grid->data_ptr(),
-    &zero, grad_grid_t.data_ptr()
-  ));
+      handle,
+      desc.desc(),
+      &one,
+      idesc.desc(),
+      input->data_ptr(),
+      &zero,
+      gdesc.desc(),
+      grad_input_t.data_ptr(),
+      &one,
+      odesc.desc(),
+      grad_output->data_ptr(),
+      // intruigingly, the outputs don't need descriptors
+      grid->data_ptr(),
+      &zero,
+      grad_grid_t.data_ptr()));
 
-  return std::tuple<Tensor, Tensor>{ grad_input_t, grad_grid_t };
+  return std::tuple<Tensor, Tensor>{grad_input_t, grad_grid_t};
 }
 
-}}  // namespace at::cudnn
+}} // namespace at::cudnn
 
 #endif

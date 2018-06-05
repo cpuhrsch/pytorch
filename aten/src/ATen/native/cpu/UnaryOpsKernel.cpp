@@ -4,8 +4,8 @@
 #include <iostream>
 #include "ATen/Dispatch.h"
 #include "ATen/Parallel.h"
-#include "ATen/cpu/vec256/vec256.h"
 #include "ATen/cpu/vec256/functional.h"
+#include "ATen/cpu/vec256/vec256.h"
 #include "ATen/native/cpu/CapabilityDispatch.h"
 
 namespace at { namespace native {
@@ -17,7 +17,7 @@ template <class scalar_t, class F>
 static void parallel_apply(Tensor& result, const Tensor& self, F f) {
   internal::init_tbb_num_threads();
 
-static default_partitioner_type ap;
+  static default_partitioner_type ap;
 
   auto arr_out = result.data<scalar_t>();
   auto arr_in = self.data<scalar_t>();
@@ -38,30 +38,28 @@ static default_partitioner_type ap;
 static void abs_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_ALL_TYPES(self.type(), "abs", [&] {
     parallel_apply<scalar_t>(
-        result,
-        self,
-        [](const Vec256<scalar_t>& x) { return x.abs(); });  });
+        result, self, [](const Vec256<scalar_t>& x) { return x.abs(); });
+  });
 }
 
 static void rsqrt_kernel(Tensor& result, const Tensor& self) {
   AT_DISPATCH_FLOATING_TYPES(self.type(), "rsqrt", [&] {
-    parallel_apply<scalar_t>(
-        result,
-        self,
-        [](const Vec256<scalar_t>& x) { return Vec256<scalar_t>((scalar_t)(1)) / x.sqrt(); });  });
+    parallel_apply<scalar_t>(result, self, [](const Vec256<scalar_t>& x) {
+      return Vec256<scalar_t>((scalar_t)(1)) / x.sqrt();
+    });
+  });
 }
 
-#define IMPLEMENT_FLOAT_KERNEL(op)                                             \
-  static void op##_kernel(Tensor& result, const Tensor& self) {                \
-    AT_DISPATCH_FLOATING_TYPES(self.type(), #op, [&] {                         \
-      parallel_apply<scalar_t>(                                                \
+#define IMPLEMENT_FLOAT_KERNEL(op)                                         \
+  static void op##_kernel(Tensor& result, const Tensor& self) {            \
+    AT_DISPATCH_FLOATING_TYPES(self.type(), #op, [&] {                     \
+      parallel_apply<scalar_t>(                                            \
           result, self, [](const Vec256<scalar_t>& x) { return x.op(); }); \
-    });                                                                        \
-  }                                                                            \
+    });                                                                    \
+  }                                                                        \
   REGISTER_DISPATCH(op##Impl, &op##_kernel)
 
 } // anonymous namespace
-
 
 REGISTER_DISPATCH(absImpl, &abs_kernel);
 REGISTER_DISPATCH(rsqrtImpl, &rsqrt_kernel);

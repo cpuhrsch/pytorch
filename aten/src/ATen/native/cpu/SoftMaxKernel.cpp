@@ -199,8 +199,10 @@ struct vec_host_softmax_lastdim {
 
 template <typename scalar_t, bool LogSoftMax>
 struct vec_host_softmax_backward_lastdim {
-  static void
-  apply(Tensor& grad_input, const Tensor& grad, const Tensor& output) {
+  static void apply(
+      Tensor& grad_input,
+      const Tensor& grad,
+      const Tensor& output) {
     internal::init_tbb_num_threads();
     int64_t outer_size = 1;
     int64_t dim_size = grad.size(grad.ndimension() - 1);

@@ -10,8 +10,7 @@
 #include <algorithm>
 #include <sstream>
 
-namespace at {
-namespace native {
+namespace at { namespace native {
 
 Tensor arange(const Type& dtype, Scalar start, Scalar end, Scalar step) {
   return dtype._arange(start, end, step);
@@ -42,10 +41,10 @@ Tensor& empty_out(Tensor& result, IntList size) {
   return result;
 }
 
-// Temporary type cast operators. These are needed to trace type-casts now since
-// Type's are not supported in the IR. Instead, we call down to these
-// specialized operators for each datatype.
-// TODO: remove when we have Type support in the IR
+  // Temporary type cast operators. These are needed to trace type-casts now
+  // since Type's are not supported in the IR. Instead, we call down to these
+  // specialized operators for each datatype.
+  // TODO: remove when we have Type support in the IR
 
 #define DEFINE_CAST_OP(_1, n, _2)                                \
   Tensor _cast_##n(const Tensor& self, bool non_blocking) {      \
@@ -84,7 +83,7 @@ Tensor& eye_out_cpu(Tensor& result, int64_t n, int64_t m) {
     oss << "n must be greater than 0, got: " << n;
     throw std::runtime_error(oss.str());
   }
-  if(m <= 0) {
+  if (m <= 0) {
     m = n;
   }
 
@@ -94,8 +93,8 @@ Tensor& eye_out_cpu(Tensor& result, int64_t n, int64_t m) {
   int64_t sz = std::min<int64_t>(n, m);
   AT_DISPATCH_ALL_TYPES(result.type(), "eye", [&]() -> void {
     scalar_t* result_data = result.data<scalar_t>();
-    for(int64_t i = 0; i < sz; i++) {
-      result_data[i*(result.strides()[0] + result.strides()[1])] = 1;
+    for (int64_t i = 0; i < sz; i++) {
+      result_data[i * (result.strides()[0] + result.strides()[1])] = 1;
     }
   });
 
@@ -104,7 +103,9 @@ Tensor& eye_out_cpu(Tensor& result, int64_t n, int64_t m) {
 
 Tensor full(const Type& dtype, IntList size, Scalar fill_value) {
   if (dtype.is_sparse()) {
-    AT_ERROR("full(...) is not implemented for sparse types, got: ", dtype.toString());
+    AT_ERROR(
+        "full(...) is not implemented for sparse types, got: ",
+        dtype.toString());
   }
   auto result = dtype.tensor(size);
   return result.fill_(fill_value);
@@ -112,7 +113,9 @@ Tensor full(const Type& dtype, IntList size, Scalar fill_value) {
 
 Tensor& full_out(Tensor& result, IntList size, Scalar fill_value) {
   if (result.is_sparse()) {
-    AT_ERROR("full(...) is not implemented for sparse types, got: ", result.type().toString());
+    AT_ERROR(
+        "full(...) is not implemented for sparse types, got: ",
+        result.type().toString());
   }
   result.resize_(size);
   return result.fill_(fill_value);
@@ -178,22 +181,40 @@ Tensor rand_like(const Tensor& self, const Type& dtype) {
   return at::native::rand(dtype, self.sizes());
 }
 
-Tensor randint(const Type& dtype, int64_t high, IntList size, Generator* generator) {
+Tensor randint(
+    const Type& dtype,
+    int64_t high,
+    IntList size,
+    Generator* generator) {
   Tensor result = dtype.tensor(size);
   return result.random_(0, high, generator);
 }
 
-Tensor randint(const Type& dtype, int64_t low, int64_t high, IntList size, Generator* generator) {
+Tensor randint(
+    const Type& dtype,
+    int64_t low,
+    int64_t high,
+    IntList size,
+    Generator* generator) {
   Tensor result = dtype.tensor(size);
   return result.random_(low, high, generator);
 }
 
-Tensor& randint_out(Tensor& result, int64_t high, IntList size, Generator* generator) {
+Tensor& randint_out(
+    Tensor& result,
+    int64_t high,
+    IntList size,
+    Generator* generator) {
   result.resize_(size);
   return result.random_(0, high, generator);
 }
 
-Tensor& randint_out(Tensor& result, int64_t low, int64_t high, IntList size, Generator* generator) {
+Tensor& randint_out(
+    Tensor& result,
+    int64_t low,
+    int64_t high,
+    IntList size,
+    Generator* generator) {
   result.resize_(size);
   return result.random_(low, high, generator);
 }
@@ -210,7 +231,11 @@ Tensor randint_like(const Tensor& self, int64_t high, const Type& dtype) {
   return at::native::randint(dtype, high, self.sizes(), nullptr);
 }
 
-Tensor randint_like(const Tensor& self, int64_t low, int64_t high, const Type& dtype) {
+Tensor randint_like(
+    const Tensor& self,
+    int64_t low,
+    int64_t high,
+    const Type& dtype) {
   return at::native::randint(dtype, low, high, self.sizes(), nullptr);
 }
 
@@ -235,25 +260,23 @@ Tensor randn_like(const Tensor& self, const Type& dtype) {
 namespace {
 template <typename scalar_t>
 void randperm_cpu(Tensor& result, int64_t n, THGenerator* generator) {
-  scalar_t *r__data = result.data<scalar_t>();
+  scalar_t* r__data = result.data<scalar_t>();
 
   result.resize_({n});
   int64_t r__stride_0 = result.stride(0);
 
-  for(int64_t i = 0; i < n; i++) {
-    r__data[i*r__stride_0] = static_cast<scalar_t>(i);
+  for (int64_t i = 0; i < n; i++) {
+    r__data[i * r__stride_0] = static_cast<scalar_t>(i);
   }
 
-  for(int64_t i = 0; i < n - 1; i++)
-  {
-    int64_t z = THRandom_random(generator) % (n-i);
-    scalar_t sav = r__data[i*r__stride_0];
-    r__data[i*r__stride_0] = r__data[(z+i)*r__stride_0];
-    r__data[(z+i)*r__stride_0] = sav;
+  for (int64_t i = 0; i < n - 1; i++) {
+    int64_t z = THRandom_random(generator) % (n - i);
+    scalar_t sav = r__data[i * r__stride_0];
+    r__data[i * r__stride_0] = r__data[(z + i) * r__stride_0];
+    r__data[(z + i) * r__stride_0] = sav;
   }
 }
 } // namespace
-
 
 THGenerator* get_generator(at::Generator* gen) {
   auto default_gen = &at::globalContext().defaultGenerator(at::Backend::CPU);
@@ -321,5 +344,4 @@ Tensor zeros_like(const Tensor& self, const Type& dtype) {
   return at::native::zeros(dtype, self.sizes());
 }
 
-}
-}
+}}

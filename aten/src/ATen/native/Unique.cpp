@@ -8,8 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace at {
-namespace native{
+namespace at { namespace native {
 
 namespace {
 
@@ -49,12 +48,14 @@ std::tuple<Tensor, Tensor> _unique_cpu_template(
 }
 } // namespace
 
-std::tuple<Tensor, Tensor>
-_unique_cpu(const Tensor& self, const bool sorted, const bool return_inverse) {
+std::tuple<Tensor, Tensor> _unique_cpu(
+    const Tensor& self,
+    const bool sorted,
+    const bool return_inverse) {
   return AT_DISPATCH_ALL_TYPES(self.type(), "unique", [&] {
     return _unique_cpu_template<scalar_t>(self, sorted, return_inverse);
   });
 }
 
-}  // namespace native
-}  // namespace at
+} // namespace native
+} // namespace at

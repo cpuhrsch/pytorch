@@ -1,6 +1,7 @@
 #include "ATen/ATen.h"
 
-namespace at { namespace native {
+namespace at {
+namespace native {
 
 // These are just forwarding stubs
 
@@ -41,5 +42,5 @@ Tensor& _tanh__cuda(Tensor& self) {
 Tensor& _tanh_out_cuda(Tensor& result, const Tensor& self) {
   return at::_th_tanh_out(result, self);
 }
-
-}}
+}
+}

@@ -21,8 +21,7 @@
 // If you're writing something more specialized, please don't try to make them
 // work for your case, but just write something new instead.
 
-namespace at {
-namespace native {
+namespace at { namespace native {
 
 Tensor& fill_(Tensor& self, Scalar value) {
   return self._fill_(value);
@@ -34,10 +33,10 @@ Tensor& fill_(Tensor& self, const Tensor& value) {
 
 // NB: If you use this macro, you may also need to add a CUDA forwarding
 // stub in CUDAUnaryOps
-#define IMPLEMENT_UNARY_OP_PREQUEL(op)                           \
-  Tensor op(const Tensor& self) {                                \
-    Tensor result = self.type().tensor();                        \
-    return at::op##_out(result, self);                           \
+#define IMPLEMENT_UNARY_OP_PREQUEL(op)    \
+  Tensor op(const Tensor& self) {         \
+    Tensor result = self.type().tensor(); \
+    return at::op##_out(result, self);    \
   }
 
 #define IMPLEMENT_UNARY_OP_FLOAT_CMATH(op, opfn)                \
@@ -149,5 +148,4 @@ IMPLEMENT_UNARY_OP_VEC(sqrt, std::sqrt)
 IMPLEMENT_UNARY_OP_FLOAT_CMATH(tan, std::tan)
 IMPLEMENT_UNARY_OP_VEC(tanh, std::tanh)
 IMPLEMENT_UNARY_OP_VEC(trunc, std::trunc)
-}
-} // namespace at
+}} // namespace at

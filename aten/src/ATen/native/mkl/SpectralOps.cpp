@@ -1,17 +1,22 @@
 #include "ATen/ATen.h"
+#include "ATen/Config.h"
 #include "ATen/NativeFunctions.h"
 #include "ATen/native/SpectralOpsUtils.h"
-#include "ATen/Config.h"
 
 #if !AT_MKL_ENABLED()
 
 namespace at { namespace native {
 
-Tensor _fft_mkl(const Tensor& input, int64_t signal_ndim,
-                bool complex_input, bool complex_output,
-                bool inverse, IntList checked_signal_sizes,
-                bool normalized, bool onesided,
-                IntList output_sizes) {
+Tensor _fft_mkl(
+    const Tensor& input,
+    int64_t signal_ndim,
+    bool complex_input,
+    bool complex_output,
+    bool inverse,
+    IntList checked_signal_sizes,
+    bool normalized,
+    bool onesided,
+    IntList output_sizes) {
   throw std::runtime_error("fft: ATen not compiled with MKL support");
 }
 
@@ -22,18 +27,18 @@ Tensor _fft_mkl(const Tensor& input, int64_t signal_ndim,
 #include "ATen/ATen.h"
 #include "ATen/Config.h"
 #include "ATen/Dispatch.h"
-#include "ATen/Utils.h"
 #include "ATen/NativeFunctions.h"
+#include "ATen/Utils.h"
 
 #include <algorithm>
-#include <vector>
-#include <numeric>
 #include <cmath>
+#include <numeric>
+#include <vector>
 
-#include <mkl_dfti.h>
-#include <ATen/mkl/Exceptions.h>
 #include <ATen/mkl/Descriptors.h>
+#include <ATen/mkl/Exceptions.h>
 #include <ATen/mkl/Limits.h>
+#include <mkl_dfti.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -45,13 +50,18 @@ namespace at { namespace native {
 // conjugate symmetry. See native/SpectralUtils.h for more details.
 // The following structs are used to fill in the other half with symmetry in
 // case of real-to-complex transform with onesided=False flag.
-// See NOTE [ Fourier Transform Conjugate Symmetry ] in native/SpectralOpsUtils.h.
+// See NOTE [ Fourier Transform Conjugate Symmetry ] in
+// native/SpectralOpsUtils.h.
 
 template <typename scalar_t>
-static inline void _fft_fill_with_conjugate_symmetry_slice(Tensor& output,
-                       int64_t signal_ndim, int64_t size_last_dim,
-                       int64_t start_last_dim_idx, int64_t i, int64_t num) {
-  scalar_t *data = output.data<scalar_t>();
+static inline void _fft_fill_with_conjugate_symmetry_slice(
+    Tensor& output,
+    int64_t signal_ndim,
+    int64_t size_last_dim,
+    int64_t start_last_dim_idx,
+    int64_t i,
+    int64_t num) {
+  scalar_t* data = output.data<scalar_t>();
 
   // A slice means a slice of last dimension (of size size_last_dim)
 
@@ -61,7 +71,8 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(Tensor& output,
   // containing the index of the from_slice_data slice.
 
   // Compute the indices for the first from_slice_data
-  std::vector<int64_t> from_slice_indices(signal_ndim);  // up to before last signal dim
+  std::vector<int64_t> from_slice_indices(
+      signal_ndim); // up to before last signal dim
   int64_t remainder = i;
   // set last signal dim values
   int64_t from_slice_offset = 0;
@@ -78,8 +89,8 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(Tensor& output,
   }
 
   // First to_slice_data and from_slice_data
-  scalar_t *to_slice_data = data + i * size_last_dim * 2;
-  scalar_t *from_slice_data = data + from_slice_offset;
+  scalar_t* to_slice_data = data + i * size_last_dim * 2;
+  scalar_t* from_slice_data = data + from_slice_offset;
 
   while (num > 0) {
     // Fill to_slice_data from values in from_slice_data
@@ -126,9 +137,11 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(Tensor& output,
 // input should be a contiguous batched tensor of same size as full (twosided)
 // signals, but only contains half (onesided) of the values.
 // This function modifies inplace.
-static inline void _fft_fill_with_conjugate_symmetry_(Tensor& input,
-                      int64_t signal_ndim, int64_t size_last_dim,
-                      int64_t last_dim_start_slice) {
+static inline void _fft_fill_with_conjugate_symmetry_(
+    Tensor& input,
+    int64_t signal_ndim,
+    int64_t size_last_dim,
+    int64_t last_dim_start_slice) {
   if (last_dim_start_slice >= size_last_dim) {
     return;
   }
@@ -141,30 +154,42 @@ static inline void _fft_fill_with_conjugate_symmetry_(Tensor& input,
   if (num > 500) {
     int nthreads = omp_get_num_threads();
     int64_t num_slices_per_thread = num / nthreads + 1;
-    #pragma omp parallel
+#pragma omp parallel
     {
       int tid = omp_get_thread_num();
       int64_t start = tid * num_slices_per_thread;
-      AT_DISPATCH_FLOATING_TYPES(input.type(), "_fft_fill_with_conjugate_symmetry", [&] {
-        _fft_fill_with_conjugate_symmetry_slice<scalar_t>(input, signal_ndim, size_last_dim,
-            last_dim_start_slice, start, std::min(num_slices_per_thread, num - start));
-      });
+      AT_DISPATCH_FLOATING_TYPES(
+          input.type(), "_fft_fill_with_conjugate_symmetry", [&] {
+            _fft_fill_with_conjugate_symmetry_slice<scalar_t>(
+                input,
+                signal_ndim,
+                size_last_dim,
+                last_dim_start_slice,
+                start,
+                std::min(num_slices_per_thread, num - start));
+          });
     }
     return;
   }
 #endif
-  AT_DISPATCH_FLOATING_TYPES(input.type(), "_fft_fill_with_conjugate_symmetry", [&] {
-    _fft_fill_with_conjugate_symmetry_slice<scalar_t>(input, signal_ndim, size_last_dim,
-        last_dim_start_slice, 0, num);
-  });
+  AT_DISPATCH_FLOATING_TYPES(
+      input.type(), "_fft_fill_with_conjugate_symmetry", [&] {
+        _fft_fill_with_conjugate_symmetry_slice<scalar_t>(
+            input, signal_ndim, size_last_dim, last_dim_start_slice, 0, num);
+      });
 }
 
 // MKL DFTI
-Tensor _fft_mkl(const Tensor& self, int64_t signal_ndim,
-                bool complex_input, bool complex_output,
-                bool inverse, IntList checked_signal_sizes,
-                bool normalized, bool onesided,
-                IntList output_sizes) {
+Tensor _fft_mkl(
+    const Tensor& self,
+    int64_t signal_ndim,
+    bool complex_input,
+    bool complex_output,
+    bool inverse,
+    IntList checked_signal_sizes,
+    bool normalized,
+    bool onesided,
+    IntList output_sizes) {
   int64_t batch = self.size(0);
   Tensor input = self;
   // real/imag dimension must aligned when viewed as of complex type
@@ -191,7 +216,8 @@ Tensor _fft_mkl(const Tensor& self, int64_t signal_ndim,
       osize = output_sizes[i];
       istride = complex_input ? input.stride(i) >> 1 : input.stride(i);
       ostride = onumel;
-      if (isize > MKL_LONG_MAX || osize > MKL_LONG_MAX || ostride > MKL_LONG_MAX) {
+      if (isize > MKL_LONG_MAX || osize > MKL_LONG_MAX ||
+          ostride > MKL_LONG_MAX) {
         std::ostringstream ss;
         ss << "MKL FFT: input signal numel exceeds allowed range [1 ~ "
            << MKL_LONG_MAX << "]";
@@ -237,13 +263,16 @@ Tensor _fft_mkl(const Tensor& self, int64_t signal_ndim,
     signal_type = complex_output ? DFTI_COMPLEX : DFTI_REAL;
   }
   // create descriptor with signal size
-  std::vector<MKL_LONG> mkl_signal_sizes(checked_signal_sizes.begin(), checked_signal_sizes.end());
+  std::vector<MKL_LONG> mkl_signal_sizes(
+      checked_signal_sizes.begin(), checked_signal_sizes.end());
   DftiDescriptor descriptor;
   descriptor.init(prec, signal_type, signal_ndim, mkl_signal_sizes.data());
   // out of place FFT
-  MKL_DFTI_CHECK(DftiSetValue(descriptor.get(), DFTI_PLACEMENT, DFTI_NOT_INPLACE));
+  MKL_DFTI_CHECK(
+      DftiSetValue(descriptor.get(), DFTI_PLACEMENT, DFTI_NOT_INPLACE));
   // batch mode
-  MKL_DFTI_CHECK(DftiSetValue(descriptor.get(), DFTI_NUMBER_OF_TRANSFORMS, batch));
+  MKL_DFTI_CHECK(
+      DftiSetValue(descriptor.get(), DFTI_NUMBER_OF_TRANSFORMS, batch));
 
   auto istrides = input.strides();
   auto ostrides = output.strides();
@@ -254,17 +283,21 @@ Tensor _fft_mkl(const Tensor& self, int64_t signal_ndim,
   MKL_DFTI_CHECK(DftiSetValue(descriptor.get(), DFTI_OUTPUT_DISTANCE, odist));
   // signal strides
   // first val is offset, set to zero (ignored)
-  std::vector<MKL_LONG> mkl_istrides(1 + signal_ndim, 0), mkl_ostrides(1 + signal_ndim, 0);
+  std::vector<MKL_LONG> mkl_istrides(1 + signal_ndim, 0),
+      mkl_ostrides(1 + signal_ndim, 0);
   for (int64_t i = 1; i <= signal_ndim; i++) {
     mkl_istrides[i] = complex_input ? istrides[i] >> 1 : istrides[i];
     mkl_ostrides[i] = complex_output ? ostrides[i] >> 1 : ostrides[i];
   }
-  MKL_DFTI_CHECK(DftiSetValue(descriptor.get(), DFTI_INPUT_STRIDES, mkl_istrides.data()));
-  MKL_DFTI_CHECK(DftiSetValue(descriptor.get(), DFTI_OUTPUT_STRIDES, mkl_ostrides.data()));
+  MKL_DFTI_CHECK(
+      DftiSetValue(descriptor.get(), DFTI_INPUT_STRIDES, mkl_istrides.data()));
+  MKL_DFTI_CHECK(
+      DftiSetValue(descriptor.get(), DFTI_OUTPUT_STRIDES, mkl_ostrides.data()));
   // if conjugate domain of real is involved, set standard CCE storage type
   // this will become default in MKL in future
   if (!complex_input || !complex_output) {
-    MKL_DFTI_CHECK(DftiSetValue(descriptor.get(), DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX));
+    MKL_DFTI_CHECK(DftiSetValue(
+        descriptor.get(), DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX));
   }
   // rescale if needed by normalized flag or inverse transform
   if (normalized || inverse) {
@@ -275,23 +308,28 @@ Tensor _fft_mkl(const Tensor& self, int64_t signal_ndim,
     } else {
       double_scale = 1.0 / static_cast<double>(signal_numel);
     }
-    MKL_DFTI_CHECK(DftiSetValue(descriptor.get(),
-      inverse ? DFTI_BACKWARD_SCALE : DFTI_FORWARD_SCALE,
-      prec == DFTI_DOUBLE ? double_scale : static_cast<float>(double_scale)));
+    MKL_DFTI_CHECK(DftiSetValue(
+        descriptor.get(),
+        inverse ? DFTI_BACKWARD_SCALE : DFTI_FORWARD_SCALE,
+        prec == DFTI_DOUBLE ? double_scale : static_cast<float>(double_scale)));
   }
   // finalize
   MKL_DFTI_CHECK(DftiCommitDescriptor(descriptor.get()));
   // run
   if (!inverse) {
-    MKL_DFTI_CHECK(DftiComputeForward(descriptor.get(), input.data_ptr(), output.data_ptr()));
+    MKL_DFTI_CHECK(DftiComputeForward(
+        descriptor.get(), input.data_ptr(), output.data_ptr()));
   } else {
-    MKL_DFTI_CHECK(DftiComputeBackward(descriptor.get(), input.data_ptr(), output.data_ptr()));
+    MKL_DFTI_CHECK(DftiComputeBackward(
+        descriptor.get(), input.data_ptr(), output.data_ptr()));
   }
   // now if needed, fill out the other half using Hermitian symmetry dim
   if (!complex_input && complex_output && !onesided) {
     auto size_last_signal_dim = checked_signal_sizes[signal_ndim - 1];
-    auto start_slice = infer_ft_real_to_complex_onesided_size(size_last_signal_dim);
-    _fft_fill_with_conjugate_symmetry_(output, signal_ndim, size_last_signal_dim, start_slice);
+    auto start_slice =
+        infer_ft_real_to_complex_onesided_size(size_last_signal_dim);
+    _fft_fill_with_conjugate_symmetry_(
+        output, signal_ndim, size_last_signal_dim, start_slice);
   }
   return output;
 }
@@ -299,4 +337,3 @@ Tensor _fft_mkl(const Tensor& self, int64_t signal_ndim,
 }} // namespace at::native
 
 #endif
-

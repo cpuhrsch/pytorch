@@ -1,7 +1,7 @@
+#include <type_traits>
 #include "ATen/ATen.h"
 #include "ATen/Dispatch.h"
 #include "ATen/NativeFunctions.h"
-#include <type_traits>
 
 namespace at { namespace native {
 
@@ -17,7 +17,7 @@ bool is_floating_point(const Tensor& self) {
   return at::isFloatingType(self.type().scalarType());
 }
 
-bool is_signed(const Tensor &self) {
+bool is_signed(const Tensor& self) {
   if (self.type().scalarType() == ScalarType::Half) {
     return true;
   }

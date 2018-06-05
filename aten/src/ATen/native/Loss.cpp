@@ -3,10 +3,15 @@
 
 #define EPSILON 1e-12
 
-
 namespace at { namespace native {
 
-Tensor cosine_embedding_loss(const Tensor& input1, const Tensor& input2, const Tensor& target, double margin, bool size_average, bool reduce) {
+Tensor cosine_embedding_loss(
+    const Tensor& input1,
+    const Tensor& input2,
+    const Tensor& target,
+    double margin,
+    bool size_average,
+    bool reduce) {
   auto prod_sum = (input1 * input2).sum(1);
   auto mag_square1 = (input1 * input1).sum(1) + EPSILON;
   auto mag_square2 = (input2 * input2).sum(1) + EPSILON;
@@ -28,7 +33,12 @@ Tensor cosine_embedding_loss(const Tensor& input1, const Tensor& input2, const T
   return output;
 }
 
-Tensor hinge_embedding_loss(const Tensor& self, const Tensor& target, double margin, bool size_average, bool reduce) {
+Tensor hinge_embedding_loss(
+    const Tensor& self,
+    const Tensor& target,
+    double margin,
+    bool size_average,
+    bool reduce) {
   auto zeros = at::zeros_like(self);
   auto margin_clamp = (margin - self).clamp_min_(0);
   auto output_margin = at::where(target != 1, margin_clamp, zeros);
@@ -43,8 +53,16 @@ Tensor hinge_embedding_loss(const Tensor& self, const Tensor& target, double mar
   return output;
 }
 
-Tensor triplet_margin_loss(const Tensor& anchor, const Tensor& positive, const Tensor& negative, double margin,
-                           double p, double eps, bool swap, bool size_average, bool reduce) {
+Tensor triplet_margin_loss(
+    const Tensor& anchor,
+    const Tensor& positive,
+    const Tensor& negative,
+    double margin,
+    double p,
+    double eps,
+    bool swap,
+    bool size_average,
+    bool reduce) {
   auto dist_pos = at::pairwise_distance(anchor, positive, p, eps);
   auto dist_neg = at::pairwise_distance(anchor, negative, p, eps);
   if (swap) {
@@ -61,8 +79,14 @@ Tensor triplet_margin_loss(const Tensor& anchor, const Tensor& positive, const T
   return output;
 }
 
-Tensor margin_ranking_loss(const Tensor& input1, const Tensor& input2, const Tensor& target, double margin, bool size_average, bool reduce) {
-  auto output =  (-target * (input1 - input2) + margin).clamp_min_(0);
+Tensor margin_ranking_loss(
+    const Tensor& input1,
+    const Tensor& input2,
+    const Tensor& target,
+    double margin,
+    bool size_average,
+    bool reduce) {
+  auto output = (-target * (input1 - input2) + margin).clamp_min_(0);
 
   if (reduce && size_average) {
     return output.sum() / output.numel();
@@ -71,4 +95,4 @@ Tensor margin_ranking_loss(const Tensor& input1, const Tensor& input2, const Ten
   }
   return output;
 }
-}}  // namespace at::native
+}} // namespace at::native

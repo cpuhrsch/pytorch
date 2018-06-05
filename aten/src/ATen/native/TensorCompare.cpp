@@ -28,11 +28,21 @@ void where_cpu(
 
 namespace at { namespace native {
 
-bool allclose(const Tensor& self, const Tensor& other, double rtol, double atol, bool equal_nan) {
+bool allclose(
+    const Tensor& self,
+    const Tensor& other,
+    double rtol,
+    double atol,
+    bool equal_nan) {
   return at::isclose(self, other, rtol, atol, equal_nan).all().toCByte();
 }
 
-Tensor isclose(const Tensor& self, const Tensor& other, double rtol, double atol, bool equal_nan) {
+Tensor isclose(
+    const Tensor& self,
+    const Tensor& other,
+    double rtol,
+    double atol,
+    bool equal_nan) {
   // TODO: use bitwise operator overloads once we add them
   auto actual_error = (self - other).abs();
   auto max_error = atol + rtol * other.abs();
@@ -56,7 +66,7 @@ bool is_nonzero(const Tensor& self) {
   Scalar localScalar = self.pImpl->localScalar();
   if (localScalar.isFloatingPoint()) {
     return localScalar.to<double>() != 0;
-  } else if (localScalar.isIntegral()){
+  } else if (localScalar.isIntegral()) {
     return localScalar.to<int64_t>() != 0;
   }
   AT_ERROR("expected non-Tensor backed scalar");
@@ -64,15 +74,20 @@ bool is_nonzero(const Tensor& self) {
 
 Tensor where(const Tensor& condition, const Tensor& self, const Tensor& other) {
   if (condition.type().scalarType() != ScalarType::Byte) {
-    AT_ERROR("Expected condition to have ScalarType Byte, but got ScalarType ",
-                  toString(condition.type().scalarType()));
+    AT_ERROR(
+        "Expected condition to have ScalarType Byte, but got ScalarType ",
+        toString(condition.type().scalarType()));
   }
   Tensor b_condition, b_self, b_other;
-  std::tie(b_condition, b_self, b_other) = expand_outplace(condition, self, other, "where");
+  std::tie(b_condition, b_self, b_other) =
+      expand_outplace(condition, self, other, "where");
   return at::_s_where(b_condition, b_self, b_other);
 }
 
-Tensor _s_where_cpu(const Tensor& condition, const Tensor& self, const Tensor& other) {
+Tensor _s_where_cpu(
+    const Tensor& condition,
+    const Tensor& self,
+    const Tensor& other) {
   Tensor ret = self.type().tensor(self.sizes());
   AT_DISPATCH_ALL_TYPES(ret.type(), "where", [&] {
     where_cpu<scalar_t>(ret, condition, self, other);

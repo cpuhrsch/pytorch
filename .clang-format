@@ -37,13 +37,14 @@ BreakAfterJavaFieldAnnotations: false
 BreakStringLiterals: false
 ColumnLimit:     80
 CommentPragmas:  '^ IWYU pragma:'
-CompactNamespaces: false
+CompactNamespaces: true
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false
 DisableFormat:   false
+FixNamespaceComments: false
 ForEachMacros:   [ FOR_EACH_RANGE, FOR_EACH, ]
 IncludeCategories:
   - Regex:           '^<.*\.h(pp)?>'

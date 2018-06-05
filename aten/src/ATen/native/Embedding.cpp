@@ -1,6 +1,6 @@
 #include "ATen/ATen.h"
-#include "ATen/TensorUtils.h"
 #include "ATen/NativeFunctions.h"
+#include "ATen/TensorUtils.h"
 
 #include <cstring>
 #include <memory>
@@ -11,11 +11,14 @@
 #include <omp.h>
 #endif
 
-
 namespace at { namespace native {
 
-Tensor embedding(const Tensor & weight, const Tensor & indices,
-                 int64_t padding_idx, bool scale_grad_by_freq, bool sparse) {
+Tensor embedding(
+    const Tensor& weight,
+    const Tensor& indices,
+    int64_t padding_idx,
+    bool scale_grad_by_freq,
+    bool sparse) {
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarType("embedding", indices_arg, kLong);
   checkContiguous("embedding", indices_arg);
@@ -33,8 +36,12 @@ Tensor embedding(const Tensor & weight, const Tensor & indices,
 }
 
 Tensor embedding_backward(
-    const Tensor & grad, const Tensor & indices, int64_t num_weights,
-    int64_t padding_idx, bool scale_grad_by_freq, bool sparse) {
+    const Tensor& grad,
+    const Tensor& indices,
+    int64_t num_weights,
+    int64_t padding_idx,
+    bool scale_grad_by_freq,
+    bool sparse) {
   if (sparse) {
     return at::embedding_sparse_backward(
         grad, indices, num_weights, padding_idx, scale_grad_by_freq);
@@ -45,9 +52,11 @@ Tensor embedding_backward(
 }
 
 Tensor embedding_sparse_backward(
-    const Tensor & grad_, const Tensor & indices_, int64_t num_weights,
-    int64_t padding_idx, bool scale_grad_by_freq) {
-
+    const Tensor& grad_,
+    const Tensor& indices_,
+    int64_t num_weights,
+    int64_t padding_idx,
+    bool scale_grad_by_freq) {
   auto indices_arg = TensorArg(indices_, "indices", 2);
   checkScalarType("embedding_backward", indices_arg, kLong);
   checkContiguous("embedding_backward", indices_arg);
@@ -67,14 +76,15 @@ Tensor embedding_sparse_backward(
   }
 
   int64_t num_features = grad_.size(-1);
-  auto weight_size = std::array<int64_t, 2>{{ num_weights, num_features }};
+  auto weight_size = std::array<int64_t, 2>{{num_weights, num_features}};
   auto& dense_type = grad.type();
-  auto& sparse_type = dense_type.toBackend(grad.is_cuda() ? kSparseCUDA : kSparseCPU);
+  auto& sparse_type =
+      dense_type.toBackend(grad.is_cuda() ? kSparseCUDA : kSparseCPU);
 
   // check if all our grad come from padding_idx
   if (grad.numel() == 0) {
-    return sparse_type._sparse_coo_tensor_unsafe(indices_.type().tensor(),
-                                         dense_type.tensor(), weight_size);
+    return sparse_type._sparse_coo_tensor_unsafe(
+        indices_.type().tensor(), dense_type.tensor(), weight_size);
   }
 
   auto index = indices.view({1, -1});
@@ -83,9 +93,11 @@ Tensor embedding_sparse_backward(
 }
 
 Tensor embedding_backward_cpu(
-    const Tensor & grad_, const Tensor & indices, int64_t num_weights,
-    int64_t padding_idx, bool scale_grad_by_freq) {
-
+    const Tensor& grad_,
+    const Tensor& indices,
+    int64_t num_weights,
+    int64_t padding_idx,
+    bool scale_grad_by_freq) {
   auto indices_arg = TensorArg(indices, "indices", 2);
   checkScalarType("embedding_backward", indices_arg, kLong);
   checkContiguous("embedding_backward", indices_arg);
@@ -109,16 +121,16 @@ Tensor embedding_backward_cpu(
 
 #ifdef _OPENMP
   if (numel > 1000) {
-    // The strategy is to parallelize over sections of the vocabulary, so that
-    // thread 1 handles updates to gradWeight[0..nVocab/nThreads]. Every thread
-    // has to traverse the entire input, but the dominating factor is the axpy
-    // BLAS call.
-    #pragma omp parallel
+// The strategy is to parallelize over sections of the vocabulary, so that
+// thread 1 handles updates to gradWeight[0..nVocab/nThreads]. Every thread
+// has to traverse the entire input, but the dominating factor is the axpy
+// BLAS call.
+#pragma omp parallel
     {
       int tid = omp_get_thread_num();
       int nthreads = omp_get_num_threads();
-      int64_t start = tid * (num_weights/nthreads + 1);
-      int64_t end = start + (num_weights/nthreads + 1);
+      int64_t start = tid * (num_weights / nthreads + 1);
+      int64_t end = start + (num_weights / nthreads + 1);
       for (int64_t i = 0; i < numel; i++) {
         if (indices_data[i] != padding_idx) {
           int64_t k = indices_data[i];
@@ -150,8 +162,11 @@ Tensor embedding_backward_cpu(
   return grad_weight;
 }
 
-Tensor & embedding_renorm_cpu_(
-    Tensor & self, const Tensor & indices, double max_norm, double norm_type) {
+Tensor& embedding_renorm_cpu_(
+    Tensor& self,
+    const Tensor& indices,
+    double max_norm,
+    double norm_type) {
   auto self_arg = TensorArg(self, "self", 1);
   auto indices_arg = TensorArg(indices, "indices", 2);
   checkContiguous("embedding_renorm_", self_arg);
@@ -164,7 +179,7 @@ Tensor & embedding_renorm_cpu_(
   auto sorted_indices = std::vector<int64_t>(data_ptr, data_ptr + num_indices);
   std::sort(sorted_indices.begin(), sorted_indices.end(), std::less<int64_t>());
 
-  #pragma omp parallel for if(num_indices > 1000)
+#pragma omp parallel for if (num_indices > 1000)
   for (int64_t i = 0; i < num_indices; i++) {
     if (i > 0 && sorted_indices[i] == sorted_indices[i - 1]) {
       continue;
@@ -180,4 +195,4 @@ Tensor & embedding_renorm_cpu_(
   return self;
 }
 
-}}  // namespace at::native
+}} // namespace at::native
