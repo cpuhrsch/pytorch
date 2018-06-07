@@ -50,11 +50,11 @@ set_property(CACHE BLAS PROPERTY STRINGS "Eigen;ATLAS;OpenBLAS;MKL;vecLib")
 message(STATUS "The BLAS backend of choice:" ${BLAS})
 
 message("RPATH1: ${CMAKE_INSTALL_PREFIX}/lib")
-# include("${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb/cmake/TBBBuild.cmake")
-# tbb_build(TBB_ROOT "${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb" CONFIG_DIR TBB_DIR)
-include("${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb/cmake/TBBGet.cmake")
-tbb_get(TBB_ROOT "${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb" CONFIG_DIR TBB_DIR)
-find_package(TBB REQUIRED tbb)
+include("${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb/cmake/TBBBuild.cmake")
+tbb_build(TBB_ROOT "${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb" CONFIG_DIR TBB_DIR)
+# include("${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb/cmake/TBBGet.cmake")
+# tbb_get(TBB_ROOT "${CMAKE_CURRENT_LIST_DIR}/../third_party/tbb" CONFIG_DIR TBB_DIR)
+find_package(TBB REQUIRED)
 
 if(BLAS STREQUAL "Eigen")
   # Eigen is header-only and we do not have any dependent libraries

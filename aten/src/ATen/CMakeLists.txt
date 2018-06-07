@@ -30,7 +30,7 @@ function(filter_list output input)
 endfunction()
 
 
-list(APPEND ATen_CPU_INCLUDE "${TBB_DIR}/../include")
+list(APPEND ATen_THIRD_PARTY_INCLUDE "${TBB_DIR}/../include")
 list(APPEND ATen_CPU_DEPENDENCY_LIBS TBB::tbb)
 
 # Can be compiled standalone
