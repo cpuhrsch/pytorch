@@ -238,10 +238,6 @@ def create(all_types, backend):
             continue
         top_env['copy_includes'].append(
             '#include "ATen/{}.h"'.format(the_type['Type']))
-        if the_type['Density'] != 'Sparse':
-            # only Dense tensors have a derived Tensor type
-            top_env['copy_includes'].append(
-                '#include "ATen/{}.h"'.format(the_type['Tensor']))
 
     # Code generation
     for the_type in all_types:

@@ -280,7 +280,7 @@ CHECKED_CAST = {
             'Backend::${Backend}, ScalarType::Int)'),
     'THDenseTensor*':
         CodeTemplate(
-            'checked_cast_tensor<${DenseTensor}>('
+            'checked_cast_tensor<DenseTensor>('
             '${arg_name}.pImpl,"${arg_name}",${arg_pos}, ${null_okay}, '
             'Backend::${DenseBackend}, ScalarType::${ScalarName})'),
     'THDenseIndexTensor*':
@@ -332,7 +332,7 @@ ALLOC_NOARGS_WRAP = {
     'THIndexTensor*': 'detail::new_${Backend}LongTensor()',
     'THIntegerTensor*': 'detail::new_${Backend}IntTensor()',
     'THSTensor*': 'detail::new_SparseTensor()',
-    'THDenseTensor*': 'detail::new_${DenseTensor}()',
+    'THDenseTensor*': 'detail::new_DenseTensor()',
     'THDenseIndexTensor*': 'detail::new_${DenseBackend}LongTensor()',
 }
 
@@ -342,7 +342,7 @@ ALLOC_WRAP = {
     'THIndexTensor*': 'new ${Backend}LongTensor(${arguments})',
     'THIntegerTensor*': 'new ${Backend}IntTensor(${arguments})',
     'THSTensor*': 'new SparseTensor(${arguments})',
-    'THDenseTensor*': 'new ${DenseTensor}(${arguments})',
+    'THDenseTensor*': 'new DenseTensor(${arguments})',
     'THDenseIndexTensor*': 'new ${DenseBackend}LongTensor(${arguments})',
 }
 

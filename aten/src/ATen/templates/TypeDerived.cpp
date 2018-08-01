@@ -9,8 +9,7 @@
 
 $storage_tensor_headers
 #include "ATen/${Generator}.h"
-#include "ATen/${DenseTensor}.h"
-#include "ATen/${DenseBackend}LongTensor.h"
+#include "ATen/Tensor.h"
 #include "ATen/Allocator.h"
 #include "ATen/Half.h"
 #include "ATen/WrapDimUtils.h"
