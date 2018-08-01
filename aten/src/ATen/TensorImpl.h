@@ -3,6 +3,8 @@
 #include <atomic>
 #include <memory>
 
+#include <TH/THTensor.hpp>
+#include <ATen/StorageImpl.h>
 #include "ATen/Retainable.h"
 #include "ATen/ScalarType.h"
 #include "ATen/optional.h"
@@ -33,7 +35,11 @@ struct AT_API TensorImpl : public Retainable {
   virtual IntList strides() const;
   virtual int64_t dim() const;
   virtual void * unsafeGetTH(bool retain);
-  virtual std::unique_ptr<Storage> storage() = 0;
+  std::unique_ptr<Storage> storage() {
+    StorageImpl* storage = tensor->storage_;
+    storage->retain();
+    return std::unique_ptr<Storage>(new Storage(storage));
+  }
   friend struct Type;
 
   int64_t numel() {

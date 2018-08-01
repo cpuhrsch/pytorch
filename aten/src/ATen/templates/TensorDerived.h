@@ -13,7 +13,7 @@ namespace at {
 struct ${Tensor} final : public TensorImpl {
 public:
   ${Tensor}(THTensor * tensor);
-  virtual std::unique_ptr<Storage> storage() override;
+//  virtual std::unique_ptr<Storage> storage() override;
 };
 
 namespace detail {
