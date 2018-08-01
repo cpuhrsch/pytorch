@@ -44,6 +44,8 @@ namespace at {
 struct Tensor : public detail::TensorBase {
   using TensorBase = detail::TensorBase;
   Tensor() : TensorBase() {}
+  Tensor(Type* type, THTensor* tensor) : TensorImpl(type, tensor) {}
+
   Tensor(TensorImpl * self, bool retain) : TensorBase(self, retain) {}
   Tensor(const TensorBase & rhs) : TensorBase(rhs) {}
   Tensor(const Tensor & rhs) = default;
