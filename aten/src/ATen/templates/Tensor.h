@@ -80,6 +80,7 @@ struct Tensor : public detail::TensorBase {
     return pImpl->type();
   }
   std::unique_ptr<Storage> storage() const {
+    // See Note [Caffe2storage] within THTensor.hpp
     return pImpl->storage();
   }
   inline Tensor toType(const Type & t, bool non_blocking=false) const;

@@ -109,6 +109,7 @@ inline int64_t* THTensor_getStridePtr(THTensor* tensor) {
 
 // NB: Non-retaining
 inline THStorage* THTensor_getStoragePtr(const THTensor* tensor) {
+  // [Caffe2storage]
   // Within PyTorch, the invariant is that storage_ is always
   // initialized; we never have tensors that don't have any storage.
   // However, for Caffe2, this is not true, because they have permitted

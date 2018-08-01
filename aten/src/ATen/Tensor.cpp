@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/Tensor.h>
 
 #include <iostream>
 
@@ -11,4 +12,13 @@ void Tensor::print() const {
     std::cerr << "[UndefinedTensor]" << std::endl;
   }
 }
+
+// std::unique_ptr<Storage> Tensor::storage() const {
+//   auto storage = THTensor_getStoragePtr(tensor);
+// StorageImpl* storage = tensor->
+// storage->retain();
+// //  THStorage_retain(storage);
+//   return std::unique_ptr<Storage>(new Storage(storage));
+// }
+
 } // namespace at
