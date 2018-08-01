@@ -94,7 +94,7 @@ std::unique_ptr<Storage> ${Type}::storageWithAllocator(int64_t size, Allocator* 
 Tensor ${Type}::unsafeTensorFromTH(void * th_pointer, bool retain) const {
   if (retain)
     ${THTensor}_retain(${state,} (${THTensor}*) th_pointer);
-  return Tensor(new ${Tensor}((${THTensor}*)(th_pointer)), false);
+  return Tensor(new Tensor((${THTensor}*)(th_pointer)), false);
 }
 std::unique_ptr<Storage> ${Type}::unsafeStorageFromTH(void * th_pointer, bool retain) const {
   if (retain)
@@ -119,13 +119,6 @@ size_t ${Type}::elementSizeInBytes() const {
 const char * ${Type}::typeString() {
   return "${Type}";
 }
-
-/* example
-Tensor * ${Type}::add(Tensor & a, Tensor & b) {
-  std::cout << "add ${Tensor}\n";
-  return &a;
-}
-*/
 
 ${type_derived_method_definitions}
 

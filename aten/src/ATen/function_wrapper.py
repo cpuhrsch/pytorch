@@ -180,7 +180,7 @@ if(${check_name}.type().is_sparse()) {
 }""")
 
 BUFFER_DEFINITION = CodeTemplate("""\
-auto ${name}_ = new ${Tensor}(${THTensor}_new());
+auto ${name}_ = new Tensor(${THTensor}_new());
 auto ${name} = Tensor(${name}_, false);""")
 
 CONDITIONAL_INITIALIZER = CodeTemplate("""\
@@ -255,12 +255,12 @@ TYPE_RETURN = {
 CHECKED_CAST = {
     'THTensor*':
         CodeTemplate(
-            'checked_cast_tensor<${Tensor}>('
+            'checked_cast_tensor<Tensor>('
             '${arg_name}.pImpl,"${arg_name}",${arg_pos}, ${null_okay}, '
             'Backend::${Backend}, ScalarType::${ScalarName})'),
     'THSTensor*':
         CodeTemplate(
-            'checked_cast_tensor<Sparse${Tensor}>('
+            'checked_cast_tensor<SparseTensor>('
             '${arg_name}.tref.pImpl,"${arg_name}",${arg_pos},false, '
             'Backend::${Backend}, ScalarType::${ScalarName})'),
     'THBoolTensor*':
@@ -303,7 +303,7 @@ CHECKED_CAST = {
     'real': CodeTemplate('${arg_name}.to${ScalarName}()'),
     'accreal': CodeTemplate('${arg_name}.to${AccScalarName}()'),
     'TensorList': CodeTemplate(
-            'tensor_list_checked_cast<${Tensor}, Tensor, '
+            'tensor_list_checked_cast<Tensor, Tensor, '
             '${THTensor}>(${arg_name},"${arg_name}",${arg_pos}, '
             'Backend::${Backend}, ScalarType::${ScalarName})'),
     'IntList': CodeTemplate('check_intlist<${size}>(${arg_name}, "${arg_name}", ${arg_pos}${,default_init})')
@@ -327,21 +327,21 @@ CHECKED_USE = {
 CHECKED_USE_NULLABLE = CodeTemplate('${arg_name}_ ? ${usage} : NULL')
 
 ALLOC_NOARGS_WRAP = {
-    'THTensor*': 'detail::new_${Tensor}()',
+    'THTensor*': 'detail::new_Tensor()',
     'THBoolTensor*': 'detail::new_${Backend}ByteTensor()',
     'THIndexTensor*': 'detail::new_${Backend}LongTensor()',
     'THIntegerTensor*': 'detail::new_${Backend}IntTensor()',
-    'THSTensor*': 'detail::new_Sparse${Tensor}()',
+    'THSTensor*': 'detail::new_SparseTensor()',
     'THDenseTensor*': 'detail::new_${DenseTensor}()',
     'THDenseIndexTensor*': 'detail::new_${DenseBackend}LongTensor()',
 }
 
 ALLOC_WRAP = {
-    'THTensor*': 'new ${Tensor}(${arguments})',
+    'THTensor*': 'new Tensor(${arguments})',
     'THBoolTensor*': 'new ${Backend}ByteTensor(${arguments})',
     'THIndexTensor*': 'new ${Backend}LongTensor(${arguments})',
     'THIntegerTensor*': 'new ${Backend}IntTensor(${arguments})',
-    'THSTensor*': 'new Sparse${Tensor}(${arguments})',
+    'THSTensor*': 'new SparseTensor(${arguments})',
     'THDenseTensor*': 'new ${DenseTensor}(${arguments})',
     'THDenseIndexTensor*': 'new ${DenseBackend}LongTensor(${arguments})',
 }

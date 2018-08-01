@@ -13,6 +13,10 @@
 #include "ATen/Layout.h"
 #include "ATen/optional.h"
 
+#include <ATen/Tensor.h>
+#include <ATen/TensorImpl.h>
+#include <ATen/TensorMethods.h>
+
 namespace at {
 struct Generator;
 struct Type;
