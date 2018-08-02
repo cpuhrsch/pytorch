@@ -20,6 +20,7 @@ namespace at {
 struct AT_API TensorImpl : public Retainable {
   explicit TensorImpl(Type * type, THTensor * tensor)
   : type_(type), tensor(tensor) {}
+  TensorImpl(Backend backend, ScalarType scalar_type);
 
   virtual ~TensorImpl();
 
@@ -33,7 +34,7 @@ struct AT_API TensorImpl : public Retainable {
   virtual IntList strides() const;
   virtual int64_t dim() const;
   virtual void * unsafeGetTH(bool retain);
-  virtual std::unique_ptr<Storage> storage() = 0;
+  virtual std::unique_ptr<Storage> storage();
   friend struct Type;
 
   int64_t numel() {
