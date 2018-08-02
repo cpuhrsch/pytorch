@@ -180,7 +180,7 @@ if(${check_name}.type().is_sparse()) {
 }""")
 
 BUFFER_DEFINITION = CodeTemplate("""\
-auto ${name}_ = new ${Tensor}(${THTensor}_new());
+auto ${name}_ = new Tensor(${THTensor}_new());
 auto ${name} = Tensor(${name}_, false);""")
 
 CONDITIONAL_INITIALIZER = CodeTemplate("""\
@@ -255,7 +255,7 @@ TYPE_RETURN = {
 CHECKED_CAST = {
     'THTensor*':
         CodeTemplate(
-            'checked_cast_tensor<${Tensor}>('
+            'checked_cast_tensor<Tensor>('
             '${arg_name}.pImpl,"${arg_name}",${arg_pos}, ${null_okay}, '
             'Backend::${Backend}, ScalarType::${ScalarName})'),
     'THSTensor*':
@@ -312,7 +312,7 @@ CHECKED_CAST = {
 DIRECT_CONSTRUCTION_CHECKED_CAST = {'THSize*', 'THStride*'}
 
 CHECKED_USE = {
-    'THTensor*': '{}_->tensor',
+    'THTensor*': '{}_->unsafeGetTensorImpl()->tensor',
     'THSTensor*': '{}_->tensor',
     'THIndexTensor*': '{}_->tensor',
     'THBoolTensor*': '{}_->tensor',
@@ -337,7 +337,7 @@ ALLOC_NOARGS_WRAP = {
 }
 
 ALLOC_WRAP = {
-    'THTensor*': 'new ${Tensor}(${arguments})',
+    'THTensor*': 'new Tensor(${arguments})',
     'THBoolTensor*': 'new ${Backend}ByteTensor(${arguments})',
     'THIndexTensor*': 'new ${Backend}LongTensor(${arguments})',
     'THIntegerTensor*': 'new ${Backend}IntTensor(${arguments})',

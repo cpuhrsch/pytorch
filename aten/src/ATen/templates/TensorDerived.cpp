@@ -14,11 +14,6 @@ $extra_cuda_headers
 
 namespace at {
 
-namespace detail {
-  ${Tensor}* new_${Tensor}() {
-    return new ${Tensor}(${THTensor}_new(${state}));
-  }
-}
 
 ${Tensor}::${Tensor}(${THTensor} * tensor)
 : TensorImpl(&globalContext().getType(Backend::${Backend},ScalarType::${ScalarName}), tensor)

@@ -85,4 +85,8 @@ void * TensorImpl::unsafeGetTH(bool retain) {
   return tensor;
 }
 
+std::unique_ptr<Storage> TensorImpl::storage() {
+  return std::unique_ptr<Storage>(new Storage(tensor->storage_));
+}
+
 } // namespace at
