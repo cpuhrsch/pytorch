@@ -180,7 +180,7 @@ if(${check_name}.type().is_sparse()) {
 }""")
 
 BUFFER_DEFINITION = CodeTemplate("""\
-auto ${name}_ = ${THTensor}_new();
+auto ${name}_ = new ${Tensor}(${THTensor}_new());
 auto ${name} = Tensor(${name}_, false);""")
 
 CONDITIONAL_INITIALIZER = CodeTemplate("""\
@@ -255,7 +255,7 @@ TYPE_RETURN = {
 CHECKED_CAST = {
     'THTensor*':
         CodeTemplate(
-            'checked_cast_tensor<Tensor>('
+            'checked_cast_tensor<${Tensor}>('
             '${arg_name}.pImpl,"${arg_name}",${arg_pos}, ${null_okay}, '
             'Backend::${Backend}, ScalarType::${ScalarName})'),
     'THSTensor*':
@@ -312,7 +312,7 @@ CHECKED_CAST = {
 DIRECT_CONSTRUCTION_CHECKED_CAST = {'THSize*', 'THStride*'}
 
 CHECKED_USE = {
-    'THTensor*': '{}_->get()->tensor',
+    'THTensor*': '{}_->tensor',
     'THSTensor*': '{}_->tensor',
     'THIndexTensor*': '{}_->tensor',
     'THBoolTensor*': '{}_->tensor',
@@ -337,7 +337,7 @@ ALLOC_NOARGS_WRAP = {
 }
 
 ALLOC_WRAP = {
-    'THTensor*': '${arguments}',
+    'THTensor*': 'new ${Tensor}(${arguments})',
     'THBoolTensor*': 'new ${Backend}ByteTensor(${arguments})',
     'THIndexTensor*': 'new ${Backend}LongTensor(${arguments})',
     'THIntegerTensor*': 'new ${Backend}IntTensor(${arguments})',
@@ -1455,7 +1455,7 @@ def create_derived(backend_type_env, declarations):
                     scalar_check_arg = (scalar_check if not isinstance(scalar_check, dict)
                                         else scalar_check.get(arg['name']))  # type: ignore
                     if scalar_check_arg is not None:
-                        stmt = "{}_->get()->maybe_zero_dim({});".format(arg['name'], scalar_check_arg)
+                        stmt = "{}_->maybe_zero_dim({});".format(arg['name'], scalar_check_arg)
                         if nullable_argument(arg):
                             stmt = "if ({}_) {}".format(arg['name'], stmt)
                         body.append(stmt)
@@ -1479,7 +1479,7 @@ def create_derived(backend_type_env, declarations):
                     option['aten_custom_call']).substitute(env))
 
             if ret['type'] in ALLOC_WRAP.keys():
-                maybe_scalar = "->get()->maybe_zero_dim({})".format(scalar_check) \
+                maybe_scalar = "->maybe_zero_dim({})".format(scalar_check) \
                                if scalar_check is not None \
                                else ""
                 wrapped_tensor = CodeTemplate(ALLOC_WRAP[ret['type']]).substitute(
