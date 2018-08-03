@@ -14,8 +14,8 @@ $extra_cuda_headers
 
 namespace at {
 
-${Tensor}::${Tensor}(${THTensor} * tensor)
-: TensorImpl(&globalContext().getType(Backend::${Backend},ScalarType::${ScalarName}), tensor)
-{}
+// ${Tensor}::${Tensor}(${THTensor} * tensor)
+// : TensorImpl(&globalContext().getType(Backend::${Backend},ScalarType::${ScalarName}), tensor)
+// {}
 
 }
