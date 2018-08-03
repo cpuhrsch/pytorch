@@ -21,6 +21,7 @@ struct AT_API TensorImpl : public Retainable {
   explicit TensorImpl(Type * type, THTensor * tensor)
   : type_(type), tensor(tensor) {}
   TensorImpl(Backend backend, ScalarType scalar_type);
+  TensorImpl(Backend backend, ScalarType scalar_type, THTensor* tensor);
 
   virtual ~TensorImpl();
 
