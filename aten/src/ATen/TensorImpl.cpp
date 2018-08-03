@@ -45,22 +45,13 @@ void Tensor::backward(
 TensorImpl::TensorImpl(Backend backend, ScalarType scalar_type) {
   type_ = &globalContext().getType(backend, scalar_type);
   Storage* storage = type_->storage().release();
-  StorageImpl* storage_impl = storage->pImpl();
+  storage_ = storage->pImpl();
   // storage_impl->retain();
-  storage_impl->set_resizable(true);
-  tensor = new THTensor(storage_impl);
-}
-
-TensorImpl::TensorImpl(
-    Backend backend,
-    ScalarType scalar_type,
-    THTensor* tensor_) {
-  type_ = &globalContext().getType(backend, scalar_type);
-  tensor = tensor_;
+  storage_->set_resizable(true);
 }
 
 TensorImpl::~TensorImpl() {
-  if (tensor) tensor->release();
+  if (storage_) storage_->release();
 }
 
 IntList TensorImpl::sizes() const {
@@ -72,21 +63,18 @@ IntList TensorImpl::sizes() const {
 IntList TensorImpl::strides() const {
   // NB: dim in tensor is not synchronized with THTensor, so it's
   // important to apply dim here
-  return IntList(THTensor_getStridePtr(tensor), dim());
+  return IntList(strides_.data(), dim());
 }
 
 void TensorImpl::release_resources() {
-  if (tensor) {
-      tensor->release();
-      tensor = nullptr;
-  }
+  release();
 }
 
 int64_t TensorImpl::dim() const {
-  if(THTensor_isZeroDim(tensor)) {
+  if(is_zero_dim_) {
     return 0;
   }
-  return tensor->dim();
+  return sizes_.size();
 }
 
 TensorImpl* TensorImpl::maybe_zero_dim(bool condition_when_zero_dim) {
@@ -97,14 +85,14 @@ TensorImpl* TensorImpl::maybe_zero_dim(bool condition_when_zero_dim) {
 }
 
 void * TensorImpl::unsafeGetTH(bool retain) {
-  if (retain) {
-    tensor->retain();
-  }
-  return tensor;
+  // if (retain) {
+  //   tensor->retain();
+  // }
+  return this;
 }
 
 std::unique_ptr<Storage> TensorImpl::storage() {
-  StorageImpl* storage = tensor->storage_;
+  StorageImpl* storage = storage_;
   storage->retain();
   return std::unique_ptr<Storage>(new Storage(storage));
 }

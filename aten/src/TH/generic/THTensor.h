@@ -2,7 +2,19 @@
 #define TH_GENERIC_FILE "generic/THTensor.h"
 #else
 
+#ifdef __cplusplus
+#include <ATen/Allocator.h>
+#include <ATen/TensorImpl.h>
+#endif
+
 /* a la lua? dim, storageoffset, ...  et les methodes ? */
+
+#ifdef __cplusplus
+#define THTensor at::TensorImpl
+#else
+typedef struct at_Tensor_Impl at_Tensor_Impl;
+#define THTensor at_Tensor_Impl
+#endif
 
 #define THCTensor THTensor
 
