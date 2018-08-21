@@ -101,7 +101,7 @@ void THNN_(TemporalConvolution_updateOutput)(
       THTensor *tweight = THTensor_(new)();
       THTensor_(transpose)(tweight, weight, 0, 1);
       THTensor_(addmm)(outputWindow, 1, outputWindow, 1, inputWindow, tweight);
-      THTensor_(free)(tweight);
+      tweight->release();
     }
   }
   else
@@ -149,16 +149,16 @@ void THNN_(TemporalConvolution_updateOutput)(
         THTensor *tweight = THTensor_(new)();
         THTensor_(transpose)(tweight, weight, 0, 1);
         THTensor_(addmm)(outputWindow, 1, outputWindow, 1, inputWindow, tweight);
-        THTensor_(free)(tweight);
+        tweight->release();
       }
     }
-    THTensor_(free)(outputSample);
-    THTensor_(free)(inputSample);
+    outputSample->release();
+    inputSample->release();
   }
 
-  THTensor_(free)(outputWindow);
-  THTensor_(free)(inputWindow);
-  THTensor_(free)(input);
+  outputWindow->release();
+  inputWindow->release();
+  input->release();
 
 }
 
@@ -256,14 +256,14 @@ void THNN_(TemporalConvolution_updateGradInput)(
         THTensor_(addmm)(gradInputWindow, 1, gradInputWindow, 1, gradOutputWindow, weight);
       }
     }
-    THTensor_(free)(gradOutputSample);
-    THTensor_(free)(gradInputSample);
+    gradOutputSample->release();
+    gradInputSample->release();
   }
 
-  THTensor_(free)(gradOutputWindow);
-  THTensor_(free)(gradInputWindow);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(input);
+  gradOutputWindow->release();
+  gradInputWindow->release();
+  gradOutput->release();
+  input->release();
 
 }
 
@@ -332,7 +332,7 @@ void THNN_(TemporalConvolution_accGradParameters)(
       THTensor *tgradOutputWindow = THTensor_(new)();
       THTensor_(transpose)(tgradOutputWindow, gradOutputWindow, 0, 1);
       THTensor_(addmm)(gradWeight, 1, gradWeight, scale, tgradOutputWindow, inputWindow);
-      THTensor_(free)(tgradOutputWindow);
+      tgradOutputWindow->release();
     }
   }
   else
@@ -375,17 +375,17 @@ void THNN_(TemporalConvolution_accGradParameters)(
         THTensor *tgradOutputWindow = THTensor_(new)();
         THTensor_(transpose)(tgradOutputWindow, gradOutputWindow, 0, 1);
         THTensor_(addmm)(gradWeight, 1, gradWeight, scale, tgradOutputWindow, inputWindow);
-        THTensor_(free)(tgradOutputWindow);
+        tgradOutputWindow->release();
       }
     }
-    THTensor_(free)(gradOutputSample);
-    THTensor_(free)(inputSample);
+    gradOutputSample->release();
+    inputSample->release();
   }
 
-  THTensor_(free)(gradOutputWindow);
-  THTensor_(free)(inputWindow);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(input);
+  gradOutputWindow->release();
+  inputWindow->release();
+  gradOutput->release();
+  input->release();
 
 }
 

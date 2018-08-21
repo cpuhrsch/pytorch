@@ -299,7 +299,7 @@ void THNN_(VolumetricAdaptiveMaxPooling_updateGradInput)(
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

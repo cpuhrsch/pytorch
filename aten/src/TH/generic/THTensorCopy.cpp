@@ -74,7 +74,7 @@ void THTensor_(copyTranspose)(THTensor *tensor, THTensor *src) {
       }
     }
   }
-  THTensor_(free)(buf);
+  buf->release();
   #undef MIN
   #undef MAX
 }

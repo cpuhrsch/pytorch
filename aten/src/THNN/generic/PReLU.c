@@ -54,7 +54,7 @@ void THNN_(PReLU_updateOutput)(
       n_output_data += ks;
     }
   }
-  THTensor_(free)(input);
+  input->release();
 }
 
 void THNN_(PReLU_updateGradInput)(
@@ -125,9 +125,9 @@ void THNN_(PReLU_updateGradInput)(
       n_gradOutput_data += ks;
     }
   }
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(weight);
+  input->release();
+  gradOutput->release();
+  weight->release();
 }
 
 void THNN_(PReLU_accGradParameters)(
@@ -194,9 +194,9 @@ void THNN_(PReLU_accGradParameters)(
       n_gradOutput_data += ks;
     }
   }
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(weight);
+  input->release();
+  gradOutput->release();
+  weight->release();
 }
 
 #endif

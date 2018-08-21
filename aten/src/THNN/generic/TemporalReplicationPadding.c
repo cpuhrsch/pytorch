@@ -109,7 +109,7 @@ void THNN_(TemporalReplicationPadding_updateOutput)(THNNState *state,
   }
 
   /* cleanup */
-  THTensor_(free)(input);
+  input->release();
 }
 
 static void THNN_(TemporalReplicationPadding_updateGradInput_frame)(
@@ -204,7 +204,7 @@ void THNN_(TemporalReplicationPadding_updateGradInput)(THNNState *state,
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 

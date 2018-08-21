@@ -27,8 +27,8 @@ void THNN_(GatedLinear_updateOutput)(
   THTensor_(sigmoid)(output, secondHalf);
   THTensor_(cmul)(output, output, firstHalf);
 
-  THTensor_(free)(firstHalf);
-  THTensor_(free)(secondHalf);
+  firstHalf->release();
+  secondHalf->release();
 }
 
 void THNN_(GatedLinear_updateGradInput)(
@@ -63,10 +63,10 @@ void THNN_(GatedLinear_updateGradInput)(
   THTensor_(cmul)(gradInputsecondHalf, gradInputsecondHalf, gradOutput);
   THTensor_(cmul)(gradInputsecondHalf, gradInputsecondHalf, firstHalf);
 
-  THTensor_(free)(firstHalf);
-  THTensor_(free)(secondHalf);
-  THTensor_(free)(gradInputfirstHalf);
-  THTensor_(free)(gradInputsecondHalf);
+  firstHalf->release();
+  secondHalf->release();
+  gradInputfirstHalf->release();
+  gradInputsecondHalf->release();
 }
 
 #endif

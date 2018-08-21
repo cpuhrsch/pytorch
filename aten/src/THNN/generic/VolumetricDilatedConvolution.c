@@ -200,8 +200,8 @@ void THNN_(VolumetricDilatedConvolution_updateOutput)(
   }
 
   // Free
-  THTensor_(free)(input_n);
-  THTensor_(free)(output_n);
+  input_n->release();
+  output_n->release();
 
   // Resize output
   if (is_batch == 0) {
@@ -209,9 +209,9 @@ void THNN_(VolumetricDilatedConvolution_updateOutput)(
     THTensor_(resize4d)(input, nInputPlane, inputDepth, inputHeight, inputWidth);
   }
 
-  THTensor_(free)(input);
-  THTensor_(free)(weight);
-  if (bias) THTensor_(free)(bias);
+  input->release();
+  weight->release();
+  if (bias) bias->release();
 }
 
 void THNN_(VolumetricDilatedConvolution_updateGradInput)(
@@ -303,8 +303,8 @@ void THNN_(VolumetricDilatedConvolution_updateGradInput)(
   }
 
   // Free
-  THTensor_(free)(gradInput_n);
-  THTensor_(free)(gradOutput_n);
+  gradInput_n->release();
+  gradOutput_n->release();
 
   // Resize output
   if (is_batch == 0) {
@@ -313,9 +313,9 @@ void THNN_(VolumetricDilatedConvolution_updateGradInput)(
     THTensor_(resize4d)(gradInput, nInputPlane, inputDepth, inputHeight, inputWidth);
   }
 
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(weight);
+  input->release();
+  gradOutput->release();
+  weight->release();
 }
 
 void THNN_(VolumetricDilatedConvolution_accGradParameters)(
@@ -441,8 +441,8 @@ void THNN_(VolumetricDilatedConvolution_accGradParameters)(
   }
 
   // Free
-  THTensor_(free)(input_n);
-  THTensor_(free)(gradOutput_n);
+  input_n->release();
+  gradOutput_n->release();
 
   // Resize
   if (is_batch == 0) {
@@ -450,8 +450,8 @@ void THNN_(VolumetricDilatedConvolution_accGradParameters)(
     THTensor_(resize4d)(input, nInputPlane, inputDepth, inputHeight, inputWidth);
   }
 
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
+  input->release();
+  gradOutput->release();
 }
 
 #endif

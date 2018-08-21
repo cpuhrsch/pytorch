@@ -65,7 +65,7 @@ void THNN_(TemporalUpSamplingLinear_updateOutput)(
         pos2 += outputWidth;
       }
     }
-    THTensor_(free)(input);
+    input->release();
     return;
   }
   const accreal rwidth = linear_upsampling_compute_scale<accreal>(inputWidth, outputWidth, align_corners);
@@ -84,7 +84,7 @@ void THNN_(TemporalUpSamplingLinear_updateOutput)(
       pos2 += outputWidth;
     }
   }
-  THTensor_(free)(input);
+  input->release();
 }
 
 void THNN_(TemporalUpSamplingLinear_updateGradInput)(
@@ -122,7 +122,7 @@ void THNN_(TemporalUpSamplingLinear_updateGradInput)(
         pos2 += outputWidth;
       }
     }
-    THTensor_(free)(gradOutput);
+    gradOutput->release();
     return;
   }
   const accreal rwidth = linear_upsampling_compute_scale<accreal>(inputWidth, outputWidth, align_corners);
@@ -141,7 +141,7 @@ void THNN_(TemporalUpSamplingLinear_updateGradInput)(
       pos2 += outputWidth;
     }
   }
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

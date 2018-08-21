@@ -132,7 +132,7 @@ void THNN_(SpatialReplicationPadding_updateOutput)(THNNState *state,
   }
 
   /* cleanup */
-  THTensor_(free)(input);
+  input->release();
 }
 
 static void THNN_(SpatialReplicationPadding_updateGradInput_frame)(
@@ -253,7 +253,7 @@ void THNN_(SpatialReplicationPadding_updateGradInput)(THNNState *state,
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 

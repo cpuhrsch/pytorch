@@ -104,9 +104,9 @@ void THNN_(ClassNLLCriterion_updateOutput)(
   }
 
   if (weights) {
-    THTensor_(free)(weights);
+    weights->release();
   }
-  THTensor_(free)(input);
+  input->release();
   THIndexTensor_(free)(target);
 }
 
@@ -212,7 +212,7 @@ void THNN_(ClassNLLCriterion_updateGradInput)(
 
   THIndexTensor_(free)(target);
   if (weights) {
-    THTensor_(free)(weights);
+    weights->release();
   }
 }
 

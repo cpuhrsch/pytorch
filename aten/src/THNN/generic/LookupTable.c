@@ -103,7 +103,7 @@ void THNN_(LookupTable_accGradParameters)(
       }
     }
 
-    THTensor_(free)(gradOutput);
+    gradOutput->release();
     return;
   }
 #endif
@@ -119,7 +119,7 @@ void THNN_(LookupTable_accGradParameters)(
      }
   }
 
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 /*

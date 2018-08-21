@@ -858,7 +858,7 @@ void THTensor_(addmv)(THTensor *r_, real beta, THTensor *t, real alpha, THTensor
                   vec->data<real>(), THTensor_strideLegacyNoScalars(vec, 0),
                   beta, r_->data<real>(), r_stride);
 
-    THTensor_(free)(cmat);
+    cmat->release();
   }
 
   // In gemv (x,0).mv(0) does not
@@ -912,8 +912,8 @@ void THTensor_(match)(THTensor *r_, THTensor *m1, THTensor *m2, real gain)
     }
   }
 
-  THTensor_(free)(m1);
-  THTensor_(free)(m2);
+  m1->release();
+  m2->release();
 }
 
 void THTensor_(addmm)(THTensor *r_, real beta, THTensor *t, real alpha, THTensor *m1, THTensor *m2)
@@ -975,7 +975,7 @@ void THTensor_(addmm)(THTensor *r_, real beta, THTensor *t, real alpha, THTensor
     // make r__ FORTRAN contiguous
     THTensor *transp_r_ = THTensor_(newTranspose)(r_, 0, 1);
     r__ = THTensor_(newClone)(transp_r_);
-    THTensor_(free)(transp_r_);
+    transp_r_->release();
     THTensor_(transpose)(r__, NULL, 0, 1);
   }
 
@@ -1049,10 +1049,10 @@ void THTensor_(addmm)(THTensor *r_, real beta, THTensor *t, real alpha, THTensor
 
   /* free intermediate variables */
   if(free_m1)
-    THTensor_(free)(m1_);
+    m1_->release();
 
   if(free_m2)
-    THTensor_(free)(m2_);
+    m2_->release();
 
   if(r__ != r_)
     THTensor_(freeCopyTo)(r__, r_);
@@ -1160,8 +1160,8 @@ void THTensor_(addbmm)(THTensor *result, real beta, THTensor *t, real alpha, THT
     beta = 1; // accumulate output once
   }
 
-  THTensor_(free)(matrix1);
-  THTensor_(free)(matrix2);
+  matrix1->release();
+  matrix2->release();
 }
 
 #endif /* TH_GENERIC_FILE */

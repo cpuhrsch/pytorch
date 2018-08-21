@@ -62,7 +62,7 @@ void THNN_(TemporalUpSamplingNearest_updateOutput)(
         pos2 += outputWidth;
       }
     }
-    THTensor_(free)(input);
+    input->release();
     return;
   }
 
@@ -77,7 +77,7 @@ void THNN_(TemporalUpSamplingNearest_updateOutput)(
       pos2 += outputWidth;
     }
   }
-  THTensor_(free)(input);
+  input->release();
 }
 
 void THNN_(TemporalUpSamplingNearest_updateGradInput)(
@@ -110,7 +110,7 @@ void THNN_(TemporalUpSamplingNearest_updateGradInput)(
         pos2 += outputWidth;
       }
     }
-    THTensor_(free)(gradOutput);
+    gradOutput->release();
     return;
   }
 
@@ -124,7 +124,7 @@ void THNN_(TemporalUpSamplingNearest_updateGradInput)(
       pos2 += outputWidth;
     }
   }
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

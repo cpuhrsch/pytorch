@@ -181,7 +181,7 @@ void THNN_(TemporalMaxPooling_updateOutput)(
   }
 
   /* cleanup */
-  THTensor_(free)(input);
+  input->release();
 
 }
 
@@ -277,7 +277,7 @@ void THNN_(TemporalMaxPooling_updateGradInput)(
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

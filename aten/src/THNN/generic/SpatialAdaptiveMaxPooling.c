@@ -264,7 +264,7 @@ void THNN_(SpatialAdaptiveMaxPooling_updateGradInput)(
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

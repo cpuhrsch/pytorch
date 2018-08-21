@@ -120,7 +120,7 @@ void THNN_(SpatialSubSampling_updateOutput)(
       }
     }
   }
-  THTensor_(free)(input);
+  input->release();
 }
 
 void THNN_(SpatialSubSampling_updateGradInput)(
@@ -202,7 +202,7 @@ void THNN_(SpatialSubSampling_updateGradInput)(
       }
     }
   }
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 void THNN_(SpatialSubSampling_accGradParameters)(
@@ -292,8 +292,8 @@ void THNN_(SpatialSubSampling_accGradParameters)(
     }
   }
 
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
+  input->release();
+  gradOutput->release();
 }
 
 #endif

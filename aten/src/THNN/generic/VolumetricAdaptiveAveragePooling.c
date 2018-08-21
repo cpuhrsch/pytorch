@@ -295,7 +295,7 @@ void THNN_(VolumetricAdaptiveAveragePooling_updateGradInput)(
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

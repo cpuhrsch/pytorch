@@ -96,11 +96,11 @@ void THNN_(SpatialConvolutionMap_updateOutput)(
   }
 
   /* clean up */
-  THTensor_(free)(input);
-  THTensor_(free)(output);
-  THTensor_(free)(weight);
-  if (bias) THTensor_(free)(bias);
-  THTensor_(free)(connTable);
+  input->release();
+  output->release();
+  weight->release();
+  if (bias) bias->release();
+  connTable->release();
 }
 
 void THNN_(SpatialConvolutionMap_updateGradInput)(
@@ -176,10 +176,10 @@ void THNN_(SpatialConvolutionMap_updateGradInput)(
   }
 
   /* clean up */
-  THTensor_(free)(gradInput);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(weight);
-  THTensor_(free)(connTable);
+  gradInput->release();
+  gradOutput->release();
+  weight->release();
+  connTable->release();
 }
 
 void THNN_(SpatialConvolutionMap_accGradParameters)(
@@ -270,8 +270,8 @@ void THNN_(SpatialConvolutionMap_accGradParameters)(
   }
 
   /* clean up */
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
+  input->release();
+  gradOutput->release();
 }
 
 #endif

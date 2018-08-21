@@ -75,8 +75,8 @@ void THNN_(TemporalSubSampling_updateOutput)(
     THTensor_(cadd)(outputFrame, outputFrame, 1, bias);
   }
 
-  THTensor_(free)(outputFrame);
-  THTensor_(free)(inputWindow);
+  outputFrame->release();
+  inputWindow->release();
 }
 
 void THNN_(TemporalSubSampling_updateGradInput)(
@@ -113,10 +113,10 @@ void THNN_(TemporalSubSampling_updateGradInput)(
     THTensor_(addr)(gradInputWindow, 1, gradInputWindow, 1, kwunit, buffer);
   }
 
-  THTensor_(free)(gradOutputFrame);
-  THTensor_(free)(gradInputWindow);
-  THTensor_(free)(buffer);
-  THTensor_(free)(kwunit);
+  gradOutputFrame->release();
+  gradInputWindow->release();
+  buffer->release();
+  kwunit->release();
 }
 
 void THNN_(TemporalSubSampling_accGradParameters)(
@@ -148,9 +148,9 @@ void THNN_(TemporalSubSampling_accGradParameters)(
     THTensor_(cadd)(gradBias, gradBias, scale, gradOutputFrame);
   }
 
-  THTensor_(free)(gradOutputFrame);
-  THTensor_(free)(inputWindow);
-  THTensor_(free)(buffer);
+  gradOutputFrame->release();
+  inputWindow->release();
+  buffer->release();
 }
 
 #endif

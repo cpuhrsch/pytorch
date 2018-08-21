@@ -120,7 +120,7 @@ static THTensor* THNN_(newViewWeight)(THTensor *weight)
     THTensor *old_weight = weight;
     weight = THTensor_(newWithStorage2d)(THTensor_getStoragePtr(weight), weight->storage_offset(),
 					 s1, -1, s2, -1);
-    THTensor_(free)(old_weight);
+    old_weight->release();
   }
   return weight;
 }
@@ -448,7 +448,7 @@ static void THNN_(VolumetricConvolutionMM_updateOutput_frame)(
 
   THTensor_(addmm)(output2d, 1, output2d, 1, weight, finput);
 
-  THTensor_(free)(output2d);
+  output2d->release();
 }
 
 void THNN_(VolumetricConvolutionMM_updateOutput)(
@@ -546,14 +546,14 @@ void THNN_(VolumetricConvolutionMM_updateOutput)(
         nOutputPlane, outputDepth, outputWidth, outputHeight
       );
 
-      THTensor_(free)(input_t);
-      THTensor_(free)(output_t);
-      THTensor_(free)(finput_t);
+      input_t->release();
+      output_t->release();
+      finput_t->release();
     }
   }
 
-  THTensor_(free)(input);
-  THTensor_(free)(weight);
+  input->release();
+  weight->release();
 }
 
 static void THNN_(VolumetricConvolutionMM_updateGradInput_frame)(
@@ -578,7 +578,7 @@ static void THNN_(VolumetricConvolutionMM_updateGradInput_frame)(
   );
 
   THTensor_(addmm)(fgradInput, 0, fgradInput, 1, weight, gradOutput2d);
-  THTensor_(free)(gradOutput2d);
+  gradOutput2d->release();
 
   THTensor_(zero)(gradInput);
 
@@ -657,16 +657,16 @@ void THNN_(VolumetricConvolutionMM_updateGradInput)(
         pT, pW, pH
       );
 
-      THTensor_(free)(gradInput_t);
-      THTensor_(free)(gradOutput_t);
-      THTensor_(free)(fgradInput_t);
+      gradInput_t->release();
+      gradOutput_t->release();
+      fgradInput_t->release();
     }
   }
 
-  THTensor_(free)(tweight);
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
-  THTensor_(free)(weight);
+  tweight->release();
+  input->release();
+  gradOutput->release();
+  weight->release();
 }
 
 static void THNN_(VolumetricConvolutionMM_accGradParameters_frame)(
@@ -687,7 +687,7 @@ static void THNN_(VolumetricConvolutionMM_accGradParameters_frame)(
     THTensor *tfinput = THTensor_(new)();
     THTensor_(transpose)(tfinput, finput, 0, 1);
     THTensor_(addmm)(gradWeight, 1, gradWeight, scale, gradOutput2d, tfinput);
-    THTensor_(free)(tfinput);
+    tfinput->release();
   }
 
   if (gradBias) {
@@ -703,7 +703,7 @@ static void THNN_(VolumetricConvolutionMM_accGradParameters_frame)(
     }
   }
 
-  THTensor_(free)(gradOutput2d);
+  gradOutput2d->release();
 }
 
 void THNN_(VolumetricConvolutionMM_accGradParameters)(
@@ -753,17 +753,17 @@ void THNN_(VolumetricConvolutionMM_accGradParameters)(
 
       THNN_(VolumetricConvolutionMM_accGradParameters_frame)(gradOutput_t, gradWeight, gradBias, finput_t, scale);
 
-      THTensor_(free)(gradOutput_t);
+      gradOutput_t->release();
       if (gradWeight) {
-        THTensor_(free)(finput_t);
+        finput_t->release();
       }
     }
   }
 
-  THTensor_(free)(input);
-  THTensor_(free)(gradOutput);
+  input->release();
+  gradOutput->release();
   if (gradWeight) {
-    THTensor_(free)(gradWeight);
+    gradWeight->release();
   }
 }
 

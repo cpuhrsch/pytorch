@@ -68,8 +68,8 @@ void THNN_(BatchNormalization_updateOutput)(
     TH_TENSOR_APPLY2(real, in, real, out,
       *out_data = (real) (((*in_data - mean) * invstd) * w + b););
 
-    THTensor_(free)(out);
-    THTensor_(free)(in);
+    out->release();
+    in->release();
   }
 }
 
@@ -139,7 +139,7 @@ void THNN_(BatchNormalization_backward)(
           *gradIn_data = *gradOut_data * invstd * w;);
       }
 
-      THTensor_(free)(gradIn);
+      gradIn->release();
     }
 
     if (gradWeight) {
@@ -152,8 +152,8 @@ void THNN_(BatchNormalization_backward)(
       THTensor_(set1d)(gradBias, f, val + scale * sum);
     }
 
-    THTensor_(free)(gradOut);
-    THTensor_(free)(in);
+    gradOut->release();
+    in->release();
   }
 }
 

@@ -177,7 +177,7 @@ void THNN_(VolumetricFractionalMaxPooling_updateOutput)(
   }
 
   /* cleanup */
-  THTensor_(free)(input);
+  input->release();
 }
 
 static void THNN_(VolumetricFractionalMaxPooling_updateGradInput_frame)(
@@ -273,7 +273,7 @@ void THNN_(VolumetricFractionalMaxPooling_updateGradInput)(
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

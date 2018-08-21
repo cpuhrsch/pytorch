@@ -110,10 +110,10 @@ void THNN_(MultiMarginCriterion_updateOutput)(
     THTensor_(set1d)(output, 0, sum);
   }
 
-  THTensor_(free)(input);
+  input->release();
   THIndexTensor_(free)(target);
   if(weights)
-    THTensor_(free)(weights);
+    weights->release();
 }
 
 void THNN_(MultiMarginCriterion_updateGradInput)(
@@ -214,10 +214,10 @@ void THNN_(MultiMarginCriterion_updateGradInput)(
     }
   }
 
-  THTensor_(free)(input);
+  input->release();
   THIndexTensor_(free)(target);
   if(weights)
-    THTensor_(free)(weights);
+    weights->release();
 }
 
 #endif

@@ -91,10 +91,10 @@ void THNN_(VolumetricConvolution_updateOutput)(
       THTensor_(conv3Dmv)(outb, 1.0, 1.0, inb, weight, dT, dH, dW, "V", "X");
     }
 
-    THTensor_(free)(inb);
-    THTensor_(free)(outb);
+    inb->release();
+    outb->release();
   }
-  THTensor_(free)(outn);
+  outn->release();
 }
 
 void THNN_(VolumetricConvolution_updateGradInput)(
@@ -157,11 +157,11 @@ void THNN_(VolumetricConvolution_updateGradInput)(
       THTensor_(select)(goutb, gradOutput, 0, j);
       THTensor_(conv3Dmv)(ginpb, 0.0, 1.0, goutb, tweight, dT, dH, dW, "F", "C");
     }
-    THTensor_(free)(ginpb);
-    THTensor_(free)(goutb);
+    ginpb->release();
+    goutb->release();
   }
 
-  THTensor_(free)(tweight);
+  tweight->release();
 }
 
 void THNN_(VolumetricConvolution_accGradParameters)(
@@ -218,7 +218,7 @@ void THNN_(VolumetricConvolution_accGradParameters)(
         THTensor_(select)(gradOutSlice, gradOutput, 0, k);
         gradBias_data[k] += scale * THTensor_(sumall)(gradOutSlice);
       }
-      THTensor_(free)(gradOutSlice);
+      gradOutSlice->release();
     }
 
     /* gradient to kernels */
@@ -246,14 +246,14 @@ void THNN_(VolumetricConvolution_accGradParameters)(
           THTensor_(select)(gradOutSlice, goutb, 0, k);
           gradBias_data[k] += scale * THTensor_(sumall)(gradOutSlice);
         }
-        THTensor_(free)(gradOutSlice);
+        gradOutSlice->release();
       }
 
       /* gradient to kernels */
       THTensor_(conv3DRevger)(gradWeight, 1.0, scale, inpb, goutb, dT, dH, dW);
     }
-    THTensor_(free)(inpb);
-    THTensor_(free)(goutb);
+    inpb->release();
+    goutb->release();
   }
 }
 

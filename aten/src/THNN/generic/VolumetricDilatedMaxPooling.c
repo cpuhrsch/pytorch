@@ -331,7 +331,7 @@ void THNN_(VolumetricDilatedMaxPooling_updateOutput)(
   }
 
   /* cleanup */
-  THTensor_(free)(input);
+  input->release();
 }
 
 static void THNN_(VolumetricDilatedMaxPooling_updateGradInput_frame)(
@@ -497,7 +497,7 @@ void THNN_(VolumetricDilatedMaxPooling_updateGradInput)(
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif

@@ -116,7 +116,7 @@ void THNN_(TemporalReflectionPadding_updateOutput)(THNNState *state,
   }
 
   /* cleanup */
-  THTensor_(free)(input);
+  input->release();
 }
 
 static void THNN_(TemporalReflectionPadding_updateGradInput_frame)(
@@ -212,7 +212,7 @@ void THNN_(TemporalReflectionPadding_updateGradInput)(THNNState *state,
   }
 
   /* cleanup */
-  THTensor_(free)(gradOutput);
+  gradOutput->release();
 }
 
 #endif
