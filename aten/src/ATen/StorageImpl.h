@@ -124,7 +124,7 @@ struct AT_API StorageImpl : public c10::intrusive_ptr_target {
   }
 
  private:
-  at::DataType data_type_;
+  caffe2::TypeIdentifier data_type_;
   at::DataPtr data_ptr_;
   int64_t numel_;
   bool resizable_;

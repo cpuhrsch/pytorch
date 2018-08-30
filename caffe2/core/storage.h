@@ -85,11 +85,11 @@ class CAFFE2_API StorageImpl {
     return data_ptr_;
   }
 
-  void set_dtype(const DataType& data_type) {
+  void set_dtype(const TypeMeta& data_type) {
     data_type_ = data_type;
   }
 
-  const DataType& dtype() const {
+  const TypeMeta& dtype() const {
     return data_type_;
   }
 
@@ -125,7 +125,7 @@ class CAFFE2_API StorageImpl {
   template <typename Deleter = MemoryDeleter>
   void SingleUseStorageShareExternalPointer(
       void* src,
-      const DataType& data_type,
+      const TypeMeta& data_type,
       size_t capacity,
       Deleter d = nullptr) {
     // TODO: this will be added in the intrusive_ptr diff
@@ -153,7 +153,7 @@ class CAFFE2_API StorageImpl {
 
  private:
   int64_t capacity_ = 0;
-  DataType data_type_;
+  TypeMeta data_type_;
   DataPtr data_ptr_;
   // allocator_ takes precedence over StaticContext from device_type_
   // Allocator* allocator_;
