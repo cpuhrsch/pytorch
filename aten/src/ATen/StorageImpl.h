@@ -66,7 +66,7 @@ struct AT_API StorageImpl : public c10::intrusive_ptr_target {
   void operator=(const StorageImpl&) = delete;
 
   size_t itemsize() const {
-    return at::elementSize(dataTypeToScalarType(data_type_));
+    return at::dataTypeToTypeMeta(data_type_).itemsize();
   }
 
   Type& type();

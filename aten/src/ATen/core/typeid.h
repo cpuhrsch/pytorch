@@ -488,4 +488,5 @@ CAFFE_DECLARE_KNOWN_TYPE(23, std::vector<long>)
 #endif // CAFFE2_UNIQUE_LONG_TYPEMETA
 
 CAFFE_DECLARE_KNOWN_TYPE(24, _CaffeHighestPreallocatedTypeId)
+
 } // namespace caffe2

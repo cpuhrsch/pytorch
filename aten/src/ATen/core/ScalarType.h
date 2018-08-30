@@ -64,6 +64,17 @@ static inline ScalarType dataTypeToScalarType(DataType dtype) {
   AT_ERROR("Unsupported DataType in ATen: ", dtype, " (please report this error)");
 }
 
+static inline caffe2::TypeMeta dataTypeToTypeMeta(DataType dtype) {
+#define DEFINE_IF(ctype, name, _)               \
+  if (dtype == caffe2::TypeMeta::Id<ctype>()) { \
+    return caffe2::TypeMeta::Make<ctype>();             \
+  }
+  AT_FORALL_SCALAR_TYPES(DEFINE_IF)
+#undef DEFINE_IF
+  AT_ERROR(
+      "Unsupported DataType in ATen: ", dtype, " (please report this error)");
+}
+
 #define DEFINE_CONSTANT(_,name,_2) \
 constexpr ScalarType k##name = ScalarType::name;
 
