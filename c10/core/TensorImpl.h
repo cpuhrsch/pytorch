@@ -18,6 +18,8 @@
 #include <c10/util/Logging.h>
 #include <c10/util/python_stub.h>
 
+#define __MAX__DIM 32
+
 // A global boolean variable to control whether we free memory when a Tensor
 // is shrinked to a smaller size. As a result, a Tensor is always going to
 // keep the memory allocated for its maximum capacity reshaped to so far.
@@ -1000,7 +1002,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
         is_contiguous_,
         "Right now Extend is only supported for contiguous Tensor.");
     // auto newDims = sizes_;
-    int64_t newDims[32];
+    int64_t newDims[__MAX__DIM];
     // newDims[0] += num;
     newDims[0] = sizes_[0] + num;
     if (!storage_.data()) {
@@ -1084,7 +1086,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     //     newCapacity.end(),
     //     static_cast<int64_t>(1),
     //     std::multiplies<int64_t>());
-    int64_t newCapacity[32];
+    int64_t newCapacity[__MAX__DIM];
     newCapacity[0] = outer_dim;
     int64_t newNumel = 1;
     for (int64_t i = 0; i < dim(); i++){
@@ -1562,8 +1564,8 @@ protected:
   // SmallVector<int64_t,5> sizes_;
   // SmallVector<int64_t,5> strides_;
 
-  int64_t sizes_[32];
-  int64_t strides_[32];
+  int64_t sizes_[__MAX__DIM];
+  int64_t strides_[__MAX__DIM];
 
   int64_t storage_offset_ = 0;
   // If sizes and strides are empty, the numel is 1!!  However, most of the
