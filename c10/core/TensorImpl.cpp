@@ -93,8 +93,8 @@ void TensorImpl::release_resources() {
 }
 
 int64_t TensorImpl::dim() const {
-  return 32;
   // return sizes_.size();
+  return dim_;
 }
 
 int64_t TensorImpl::size(int64_t d) const {
