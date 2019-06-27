@@ -682,8 +682,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    */
   virtual void resize_dim(int64_t ndim) {
     TORCH_CHECK(allow_tensor_metadata_change(), "resize_dim is not allowed on Tensor created from .data or .detach()");
-    sizes_.resize(ndim, 0);
-    strides_.resize(ndim, 0);
+    // sizes_.resize(ndim, 0);
+    // strides_.resize(ndim, 0);
     refresh_numel();
     refresh_contiguous();
   }
@@ -698,7 +698,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    */
   virtual void set_size(int64_t dim, int64_t new_size) {
     TORCH_CHECK(allow_tensor_metadata_change(), "set_size is not allowed on Tensor created from .data or .detach()");
-    sizes_.at(dim) = new_size;
+    // sizes_.at(dim) = new_size;
+    sizes_[dim] = new_size;
     refresh_numel();
     refresh_contiguous();
   }
@@ -739,7 +740,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     TORCH_CHECK(allow_tensor_metadata_change(), "set_sizes_contiguous is not allowed on Tensor created from .data or .detach()");
     auto new_dim = new_size.size();
 
-    sizes_.resize(new_dim);
+    // sizes_.resize(new_dim);
     for (size_t dim = 0; dim < new_dim; ++dim) {
       sizes_[dim] = new_size[dim];
     }
@@ -766,12 +767,12 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
         ")");
     auto new_dim = new_size.size();
 
-    sizes_.resize(new_dim);
+    // sizes_.resize(new_dim);
     for (size_t dim = 0; dim < new_dim; ++dim) {
       sizes_[dim] = new_size[dim];
     }
 
-    strides_.resize(new_dim);
+    // strides_.resize(new_dim);
     if (new_dim > 0) {
       for (size_t dim = new_dim - 1; ; dim--) {
         if (new_stride[dim] >= 0) {
@@ -993,7 +994,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    * This op is auto-asynchronous if the underlying device (CUDA) supports it.
    */
   void Extend(int64_t num, float growthPct) {
-    TORCH_CHECK(sizes_.size() >= 1u);
+    // TORCH_CHECK(sizes_.size() >= 1u);
     TORCH_CHECK(num >= 0, "`num` must be non-negative for Extend");
     TORCH_CHECK(
         is_contiguous_,
@@ -1004,13 +1005,20 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
       Resize(newDims);
       return;
     }
-    auto newNumel = std::accumulate(
-        newDims.begin(),
-        newDims.end(),
-        static_cast<int64_t>(1),
-        std::multiplies<int64_t>());
+    // auto newNumel = std::accumulate(
+    //     newDims.begin(),
+    //     newDims.end(),
+    //     static_cast<int64_t>(1),
+    //     std::multiplies<int64_t>());
+    int64_t newNumel = 1;
+    for (int64_t i = 0; i < dim(); i++){
+      newNumel *= sizes_[i];
+    }
     if (newNumel * storage_.itemsize() <= storage_.capacity()) {
-      sizes_ = newDims;
+      // sizes_ = newDims;
+      for (int64_t i = 0; i < dim(); i++){
+        sizes_[i] = newDims[i];
+      }
       numel_ = newNumel;
       return;
     }
@@ -1046,7 +1054,10 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
           true); // non-blocking
     }
     reserved_ = true;
-    sizes_ = newDims;
+    // sizes_ = newDims;
+    for (int64_t i = 0; i < dim(); i++){
+      sizes_[i] = newDims[i];
+    }
     numel_ = newNumel;
   }
 
@@ -1063,13 +1074,18 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
         "Right now ReserveSpace is only supported for contiguous Tensor.");
     TORCH_CHECK(
         storage_.unique(), "Can't call ReserveSpace on shared storage.");
-    auto newCapacity = sizes_;
-    newCapacity[0] = outer_dim;
-    auto newNumel = std::accumulate(
-        newCapacity.begin(),
-        newCapacity.end(),
-        static_cast<int64_t>(1),
-        std::multiplies<int64_t>());
+    // auto newCapacity = sizes_;
+    // newCapacity[0] = outer_dim;
+    // auto newNumel = std::accumulate(
+    //     newCapacity.begin(),
+    //     newCapacity.end(),
+    //     static_cast<int64_t>(1),
+    //     std::multiplies<int64_t>());
+    // int64_t newNumel = 1;
+    int64_t newNumel = outer_dim;
+    for (int64_t i = 1; i < dim(); i++){
+      newNumel *= sizes_[i];
+    }
     if (newNumel * storage_.itemsize() <= storage_.capacity()) {
       return;
     }
@@ -1077,10 +1093,13 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     storage_.data_ptr().clear();
     auto oldSize = numel_;
     auto oldDims = sizes_;
-    Resize(newCapacity);
+    // Resize(newCapacity);
     // Allocate new memory but don't copy over the data
     raw_mutable_data(data_type_);
-    sizes_ = oldDims;
+    // sizes_ = oldDims;
+    for (int64_t i = 1; i < dim(); i++){
+      sizes_[i] = oldDims[i];
+    }
     numel_ = oldSize;
     reserved_ = true;
   }
@@ -1103,7 +1122,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    */
   template <typename... Ts>
   void Resize(Ts... dim_source) {
-    bool size_changed = SetDims(dim_source...);
+    // bool size_changed = SetDims(dim_source...);
+    bool size_changed = false;
     if (size_changed) {
       // If needed, we will free the data. the next mutable_data() call
       // will create the data storage.
@@ -1149,7 +1169,10 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
         " The old caffe2 mixes Reshape and Resize but this behavior has "
         "been changed. If you find this error, most likely you will need "
         "to change corresponding code from Reshape to Resize.");
-    sizes_ = dims;
+    // sizes_ = dims;
+    for (int64_t i = 0; i < dims.size(); i++){
+      sizes_[i] = dims[i];
+    }
     empty_tensor_restride(MemoryFormat::Contiguous);
   }
 
@@ -1360,7 +1383,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     is_contiguous_ = false;
     switch (memory_format) {
       case MemoryFormat::Contiguous: {
-        strides_.resize(sizes_.size(), 0);
+        // strides_.resize(sizes_.size(), 0);
         if (dim() > 0) {
           int last_idx = dim() - 1;
           strides_[last_idx] = 1;
@@ -1399,7 +1422,7 @@ private:
       typename = typename std::enable_if<std::is_integral<T>::value>::type>
   bool SetDimsTemplate(ArrayRef<T> src) {
     auto old_numel = numel_;
-    sizes_.resize(src.size());
+    // sizes_.resize(src.size());
     int64_t new_numel = 1;
     for (size_t i = 0; i < src.size(); ++i) {
       new_numel *= src[i];
@@ -1487,8 +1510,12 @@ protected:
       const c10::VariableVersion& version_counter,
       bool allow_tensor_metadata_change) {
     dest_impl->storage_ = src_impl->storage_;
-    dest_impl->sizes_ = src_impl->sizes_;
-    dest_impl->strides_ = src_impl->strides_;
+    // dest_impl->sizes_ = src_impl->sizes_;
+    // dest_impl->strides_ = src_impl->strides_;
+    for (int64_t i = 0; i < 32; i++){
+      dest_impl->sizes_[i] = src_impl->sizes_[i];
+      dest_impl->strides_[i] = src_impl->strides_[i];
+    }
     dest_impl->storage_offset_ = src_impl->storage_offset_;
     dest_impl->data_type_ = src_impl->data_type_;
     dest_impl->device_opt_ = src_impl->device_opt_;
@@ -1525,8 +1552,11 @@ protected:
   // since their size is redundant, and if we need to overflow the buffer space
   // we could keep the two pointers together. However, that would require
   // implementing another struct from scratch, so only do this if we're desperate.
-  SmallVector<int64_t,5> sizes_;
-  SmallVector<int64_t,5> strides_;
+  // SmallVector<int64_t,5> sizes_;
+  // SmallVector<int64_t,5> strides_;
+
+  int64_t sizes_[32];
+  int64_t strides_[32];
 
   int64_t storage_offset_ = 0;
   // If sizes and strides are empty, the numel is 1!!  However, most of the
@@ -1640,9 +1670,9 @@ protected:
 //    miscellaneous bitfield
 //
 #ifdef NAMEDTENSOR_ENABLED
-#define NWORDS 30
+#define NWORDS 78
 #else
-#define NWORDS 29
+#define NWORDS 77
 #endif
 static_assert(sizeof(void*) != sizeof(int64_t) || // if 64-bit...
               sizeof(TensorImpl) == sizeof(int64_t) * NWORDS,

@@ -56,7 +56,7 @@ TensorImpl::TensorImpl(Storage&& storage, TensorTypeId type_id, const caffe2::Ty
   }
   // we would also like to check that non-cpu devices have an index, but some Caffe2 operators create
   // Storages with default devices.
-  strides_.push_back(1);
+  // strides_.push_back(1);
 }
 
 IntArrayRef TensorImpl::sizes() const {
@@ -93,7 +93,8 @@ void TensorImpl::release_resources() {
 }
 
 int64_t TensorImpl::dim() const {
-  return sizes_.size();
+  return 32;
+  // return sizes_.size();
 }
 
 int64_t TensorImpl::size(int64_t d) const {
