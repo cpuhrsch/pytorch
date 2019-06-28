@@ -18,7 +18,7 @@
 #include <c10/util/Logging.h>
 #include <c10/util/python_stub.h>
 
-#define __MAX__DIM 32
+#define __MAX__DIM 8
 
 // A global boolean variable to control whether we free memory when a Tensor
 // is shrinked to a smaller size. As a result, a Tensor is always going to
@@ -1687,9 +1687,9 @@ protected:
 //    miscellaneous bitfield
 //
 #ifdef NAMEDTENSOR_ENABLED
-#define NWORDS 79
+#define NWORDS 31
 #else
-#define NWORDS 78
+#define NWORDS 30
 #endif
 static_assert(sizeof(void*) != sizeof(int64_t) || // if 64-bit...
               sizeof(TensorImpl) == sizeof(int64_t) * NWORDS,
