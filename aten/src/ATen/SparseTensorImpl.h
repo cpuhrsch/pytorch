@@ -59,6 +59,9 @@ public:
   void raw_resize_(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size) {
     TORCH_CHECK(allow_tensor_metadata_change(), "raw_resize_ is not allowed on Tensor created from .data or .detach()");
     // sizes_ = size.vec();
+    for (int64_t i = 0; i < size.size(); i++) {
+      sizes_[i] = size[i];
+    }
     sparse_dim_ = sparse_dim;
     dense_dim_ = dense_dim;
     refresh_numel();
@@ -138,6 +141,9 @@ public:
     }
 
     // sizes_ = size.vec();
+    for (int64_t i = 0; i < size.size(); i++) {
+      sizes_[i] = size[i];
+    }
     sparse_dim_ = sparse_dim;
     dense_dim_ = dense_dim;
     refresh_numel();
@@ -149,6 +155,9 @@ public:
     TORCH_CHECK(sparse_dim + dense_dim == static_cast<int64_t>(size.size()), "number of dimensions must be sparse_dim (", sparse_dim, ") + dense_dim (", dense_dim, "), but got ", size.size());
 
     // sizes_ = size.vec();
+    for (int64_t i = 0; i < size.size(); i++) {
+      sizes_[i] = size[i];
+    }
     sparse_dim_ = sparse_dim;
     dense_dim_ = dense_dim;
 

@@ -686,6 +686,11 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     TORCH_CHECK(allow_tensor_metadata_change(), "resize_dim is not allowed on Tensor created from .data or .detach()");
     // sizes_.resize(ndim, 0);
     // strides_.resize(ndim, 0);
+    for (int64_t i = dim_; i < ndim; i++) {
+      sizes_[i] = 0;
+      strides_[i] = 0;
+    }
+    dim_ = ndim;
     refresh_numel();
     refresh_contiguous();
   }
@@ -770,11 +775,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     auto new_dim = new_size.size();
 
     // sizes_.resize(new_dim);
-    for (size_t dim = 0; dim < new_dim; ++dim) {
-      sizes_[dim] = new_size[dim];
-    }
-
     // strides_.resize(new_dim);
+    dim_ = new_dim;
     if (new_dim > 0) {
       for (size_t dim = new_dim - 1; ; dim--) {
         if (new_stride[dim] >= 0) {
@@ -996,7 +998,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    * This op is auto-asynchronous if the underlying device (CUDA) supports it.
    */
   void Extend(int64_t num, float growthPct) {
-    // TORCH_CHECK(sizes_.size() >= 1u);
+    TORCH_CHECK(dim_ >= 1u);
     TORCH_CHECK(num >= 0, "`num` must be non-negative for Extend");
     TORCH_CHECK(
         is_contiguous_,
@@ -1059,7 +1061,6 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     }
     reserved_ = true;
     // sizes_ = newDims;
-    // dim_ = newDims.size();
     for (int64_t i = 0; i < dim(); i++){
       sizes_[i] = newDims[i];
     }
@@ -1128,8 +1129,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    */
   template <typename... Ts>
   void Resize(Ts... dim_source) {
-    // bool size_changed = SetDims(dim_source...);
-    // if (size_changed) {
+    bool size_changed = SetDims(dim_source...);
+    if (size_changed) {
       // If needed, we will free the data. the next mutable_data() call
       // will create the data storage.
       bool reset_tensor = false;
@@ -1149,7 +1150,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
       if (reset_tensor && storage_initialized()) {
         FreeMemory();
       }
-    // }
+    }
   }
 
   /**
@@ -1178,6 +1179,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
     for (int64_t i = 0; i < dims.size(); i++){
       sizes_[i] = dims[i];
     }
+    dim_ = dims.size();
     empty_tensor_restride(MemoryFormat::Contiguous);
   }
 
@@ -1454,6 +1456,10 @@ private:
     return SetDimsTemplate(s);
   }
 
+  bool SetDims(int64_t* sizes) {
+    return SetDims(IntArrayRef(sizes, dim_));
+  }
+
   bool SetDims() {
     return SetDims(IntArrayRef{});
   }
@@ -1521,7 +1527,7 @@ protected:
     dest_impl->storage_ = src_impl->storage_;
     // dest_impl->sizes_ = src_impl->sizes_;
     // dest_impl->strides_ = src_impl->strides_;
-    for (int64_t i = 0; i < 32; i++){
+    for (int64_t i = 0; i < __MAX__DIM; i++){
       dest_impl->sizes_[i] = src_impl->sizes_[i];
       dest_impl->strides_[i] = src_impl->strides_[i];
     }
