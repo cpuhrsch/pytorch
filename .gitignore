@@ -108,3 +108,7 @@ ENV/
 
 # Generated Files
 test/assets/sinewave.wav
+
+# BEGIN NOT-CLEAN-FILES (setup.py handles this marker. Do not change.)
+#
+# Below files are not deleted by "setup.py clean".
