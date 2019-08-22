@@ -309,20 +309,34 @@ class NestedTensor(object):
         else:
             return tuple(t.nested_size() for t in self.unbind())
 
-    def size(self):
+    def size(self, dim=None):
+        if dim is not None:
+            if dim == 0:
+                return len(self)
+            else:
+                lens = tuple(t.size(dim - 1) for t in self.unbind())
+                if isinstance(lens[0], tuple):
+                    lens = sum(lens, [])
+                return lens
+
         if self.nested_dim == 1:
-            sizes = [t.size() for t in self._tensors]
+            all_sizes = tuple(((), t.size()) for t in self._tensors)
         else:
-            sizes = [t.size() for t in self.unbind()]
-        if len(sizes) > 0:
-            size_0 = sizes[0]
-            result_size = list(size_0)
-            for i in range(len(size_0)):
-                for size in sizes:
-                    result_size[i] = size_0[i] if result_size[i] == size[i] else None
-            return (len(self),) + tuple(result_size)
-        else:
-            return ()
+            all_sizes = tuple(t.size() for t in self.unbind())
+
+        def compare_sizes(size, other_size):
+            result_size = list(map(list, size))
+            for i in range(len(size[0])):
+                result_size[0][i] = size[0][i] if size[0][i] == other_size[0][i] else None
+            for i in range(len(size[1])):
+                result_size[1][i] = size[1][i] if size[1][i] == other_size[1][i] else None
+            return tuple(result_size)
+
+        result_size = list(all_sizes[0])
+        for size in all_sizes:
+            result_size = compare_sizes(result_size, size)
+        result_size = tuple(map(tuple, result_size))
+        return ((len(self),) + result_size[0], result_size[1])
 
     # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
 
@@ -392,3 +406,6 @@ class NestedTensor(object):
         mask = mask.sum(-1)
         mask = (mask > 0)
         return tensor, mask
+
+    def to(self, *args, **kwargs):
+        return NestedTensor(self.__apply(lambda x: x.to(*args, **kwargs)))
