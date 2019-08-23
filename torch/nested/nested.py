@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import numbers
 
 from . import masking
 
@@ -9,6 +10,9 @@ DEBUG = False
 # This implementation is based on NestedTensor 0.0.1
 # NOTE: This is experimental code! Don't use this in production!
 # RFC: https://github.com/pytorch/pytorch/issues/22169
+
+# TODO: Nesting support for dim, improved wrapper decorator for cat, mv, etc.
+# TODO: Support nested lists and nested tuples for binary operations
 
 
 orig_cat = torch.cat
@@ -94,10 +98,11 @@ def nested_tensor(data, dtype=None, device=None, requires_grad=False, pin_memory
                 raise ValueError("All entries of the passed list must either be Tensors or NestedTensors")
             return NestedTensor(nested_tensors)
 
-        for data_ in data:
-            if not torch.is_tensor(data_):
-                raise ValueError("Each element of the tuple or list must "
-                                 "be a torch.Tensor")
+        data = tuple(map(lambda x: torch.tensor(x) if isinstance(x, numbers.Number) else x, data))
+        if any(map(lambda x: not torch.is_tensor(x), data)):
+            raise ValueError("Each element of the tuple or list must "
+                             "be a torch.Tensor or number")
+
         tensors = []
         for data_ in data:
             # torch.tensor copies on construction
@@ -303,40 +308,34 @@ class NestedTensor(object):
     def __apply(self, fn):
         return [fn(tensor) for tensor in self._tensors]
 
-    def nested_size(self):
+    def nested_size(self, dim=None):
+        if dim is not None:
+            if dim == 0:
+                return len(self)
+            if self.nested_dim == 1:
+                return tuple(t.size()[dim - 1] for t in self._tensors)
+            return tuple(t.nested_size(dim - 1) for t in self.unbind())
         if self.nested_dim == 1:
             return tuple(t.size() for t in self._tensors)
         else:
             return tuple(t.nested_size() for t in self.unbind())
 
-    def size(self, dim=None):
-        if dim is not None:
-            if dim == 0:
-                return len(self)
-            else:
-                lens = tuple(t.size(dim - 1) for t in self.unbind())
-                if isinstance(lens[0], tuple):
-                    lens = sum(lens, [])
-                return lens
-
+    def size(self):
         if self.nested_dim == 1:
-            all_sizes = tuple(((), t.size()) for t in self._tensors)
+            all_sizes = tuple(t.size() for t in self._tensors)
         else:
             all_sizes = tuple(t.size() for t in self.unbind())
 
         def compare_sizes(size, other_size):
-            result_size = list(map(list, size))
-            for i in range(len(size[0])):
-                result_size[0][i] = size[0][i] if size[0][i] == other_size[0][i] else None
-            for i in range(len(size[1])):
-                result_size[1][i] = size[1][i] if size[1][i] == other_size[1][i] else None
+            result_size = list(size)
+            for i in range(len(size)):
+                result_size[i] = size[i] if size[i] == other_size[i] else None
             return tuple(result_size)
 
         result_size = list(all_sizes[0])
         for size in all_sizes:
             result_size = compare_sizes(result_size, size)
-        result_size = tuple(map(tuple, result_size))
-        return ((len(self),) + result_size[0], result_size[1])
+        return (len(self),) + result_size
 
     # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
 
