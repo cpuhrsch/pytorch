@@ -10,14 +10,6 @@ from . import masking
 # Set this flag to true, if you want to enable additional verifications.
 DEBUG = False
 
-# This implementation is based on NestedTensor 0.0.1
-# NOTE: This is experimental code! Don't use this in production!
-# RFC: https://github.com/pytorch/pytorch/issues/22169
-
-# TODO: Nesting support for dim, improved wrapper decorator for cat, mv, etc.
-# TODO: Support nested lists and nested tuples for binary operations
-
-orig_cat = torch.cat
 
 # Stores path (e.g. torch.nn.lstm) -> new function (e.g. nested_cat)
 # Path is represented as a list of strings
@@ -140,7 +132,11 @@ def _check_meaningful_overwrite(cls, method_name):
                         "and not part of default class")
 
 
+orig_cat = torch.cat
+
 # TODO: Needs manual nesting semantics
+
+
 @_dispatch(lambda a0: is_nested_tensor(a0[0]))
 def cat(orig_cat, nested_tensors, dim=None):
     # Assuming 1 level of nesting
@@ -311,7 +307,8 @@ class NestedTensor(object):
     #     is_pinned
     def __init__(self, tensors):
         self._tensors = tensors
-        _verify_tensors(self)
+        if DEBUG:
+            _verify_tensors(self)
 
     # Cannot be decorated as _nested_property since
     # it's used for dispatch within the function
@@ -399,10 +396,7 @@ class NestedTensor(object):
             return tuple(t.nested_size() for t in self.unbind())
 
     def size(self):
-        if self.nested_dim == 1:
-            all_sizes = tuple(t.size() for t in self._tensors)
-        else:
-            all_sizes = tuple(t.size() for t in self.unbind())
+        all_sizes = tuple(t.size() for t in self.unbind())
 
         def compare_sizes(size, other_size):
             result_size = list(size)
@@ -415,16 +409,12 @@ class NestedTensor(object):
             result_size = compare_sizes(result_size, size)
         return (len(self),) + result_size
 
-    # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
-
     def all(self):
         return all(t.all() for t in self.unbind())
 
-    # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
     def any(self):
         return any(t.any() for t in self.unbind())
 
-    # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
     def sum(self, dim=None):
         # We currently assume len(self._tensors) is always non-zero
         if dim is None:
@@ -435,7 +425,6 @@ class NestedTensor(object):
             else:
                 raise NotImplementedError("Reductions over NestedTensor dimension not defined")
 
-    # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
     # TODO: This needs indicies!!! - not clear
     def argmax(self, dim=None):
         # We currently asmaxe len(self._tensors) is always non-zero
