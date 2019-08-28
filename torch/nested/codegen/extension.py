@@ -18,7 +18,7 @@ def get_unary_functions():
         'asin',
         'atan',
         'ceil',
-        # 'clamp', # TODO: Requires extra kwargs
+        'clamp',  # Requires extra kwargs
         'cos',
         'cosh',
         'digamma',
@@ -29,7 +29,7 @@ def get_unary_functions():
         'expm1',
         # 'exponential_', # TODO: Method only
         'floor',
-        # 'fmod',
+        'fmod',  # Requires extra kwargs
         'frac',
         # 'hardshrink', # TODO: Not part of aten
         'lgamma',
@@ -37,10 +37,11 @@ def get_unary_functions():
         'log10',
         'log1p',
         'log2',
-        # 'mvlgamma',
+        'mvlgamma',
         'neg',
-        # 'nonzero', #TODO: Special case because it modifies dtype
-        # 'polygamma',
+        # 'nonzero', # TODO: Special case because it modifies dtype - no inplace
+        # 'polygamma', # TODO: Undocumented and first argument not Tensor
+        #  polygamma NOTE: Should change to dispatch on first tensor argument not argument - but then raises questions of mixed tensor vs. nestedtensor etc.
         # 'prelu', # TODO: no prelu_out in aten
         'reciprocal',
         # 'relu', # TODO: no relu_out in aten

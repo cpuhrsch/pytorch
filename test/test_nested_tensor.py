@@ -11,7 +11,7 @@ torch = torch.nested.monkey_patch(torch)
 
 def debug_on(*exceptions):
     if not exceptions:
-        exceptions = (AssertionError, )
+        exceptions = (BaseException, )
 
     def decorator(f):
         @functools.wraps(f)
@@ -62,24 +62,51 @@ def random_float_tensor(seed, size, a=22695477, c=1, m=2 ** 32,
 def random_int_tensor(seed, size, low=0, high=2 ** 32, a=22695477, c=1, m=2 ** 32):
     """ Same as random_float_tensor but integers between [low, high)
     """
-    return torch.floor(random_float_tensor(seed, size, a, c, m) * (high - low)) + low
+    return (torch.floor(random_float_tensor(seed, size, a, c, m) * (high - low)) + low).to(torch.int64)
 
 
 def gen_float_tensor(seed, shape, requires_grad=False):
     return random_float_tensor(seed, shape, requires_grad=requires_grad)
 
 
+def gen_random_int(seed, low=0, high=2 ** 32):
+    """ Returns random integer in [low, high)
+    """
+    return int(random_int_tensor(seed, (), low=low, high=high))
+
+
+def gen_nested_list(seed, nested_dim):
+    tensors = []
+    num_tensors = gen_random_int((seed * nested_dim + seed) * 1024, low=1, high=10)
+    assert nested_dim > 0
+    if nested_dim == 1:
+        for i in range(num_tensors):
+            ran = gen_random_int((seed * nested_dim + seed) * (1024 * i), low=1, high=10)
+            tensors.append(gen_float_tensor(ran, (ran + 1, 128, 128)))
+    else:
+        tensors.append(gen_nested_list(num_tensors * seed, nested_dim - 1))
+    return tensors
+
+
+def nested_map(fn, data):
+    if isinstance(data, list):
+        for d in data:
+            return nested_map(fn, d)
+    else:
+        return [fn(d) for d in data]
+
+
+def gen_nested_tensor(seed, nested_dim):
+
+    return torch.nested_tensor(gen_nested_list(seed, nested_dim))
+
+
 class TestNestedTensor(TestCase):
 
     def test_nested_constructor(self):
-        def _gen_nested_tensor():
-            tensors = []
-            num_tensors = 4
-            for i in range(num_tensors):
-                tensors.append(gen_float_tensor(i, (i + 1, 128, 128)))
-            return torch.nested_tensor(tensors)
         num_nested_tensor = 3
-        nested_tensors = [_gen_nested_tensor() for _ in range(num_nested_tensor)]
+        # TODO: Shouldn't be constructable
+        nested_tensors = [gen_nested_tensor(i, i) for i in range(1, num_nested_tensor)]
         nested_tensor = torch.nested_tensor(nested_tensors)
         nested_tensor.cos_()
 
@@ -126,19 +153,79 @@ class TestNestedTensor(TestCase):
         self.assertTrue(not (a1 != a2).any())
         self.assertTrue(not (a1 == a3).any())
 
-    @debug_on
+    @debug_on()
+    def test_nested_dim(self):
+        nt = torch.nested_tensor([torch.tensor(3)])
+        self.assertTrue(nt.nested_dim == 1)
+        for i in range(2, 5):
+            nt = gen_nested_tensor(i, i)
+            self.assertTrue(nt.nested_dim == i)
+
+    # TODO: Make nested test
+    @debug_on()
     def test_unary(self):
-        for func in torch.nested.codegen.extension.get_unary_functions():
-            data = [gen_float_tensor(1, (2, 3)) - 0.5,
-                    gen_float_tensor(2, (2, 3)) - 0.5]
-            if func in ['log', 'log10', 'log2', 'rsqrt', 'sqrt']:
-                data = list(map(lambda x: x.abs(), data))
-            a1 = torch.nested_tensor(data)
-            a2 = torch.nested_tensor(list(map(lambda x: getattr(torch, func)(x), data)))
-            self.assertTrue(getattr(torch, func)(a1) == a2)
-            self.assertTrue(getattr(a1, func)() == a2)
-            self.assertTrue(getattr(a1, func + "_")() == a2)
-            self.assertTrue(a1 == a2)
+        for func__ in torch.nested.codegen.extension.get_unary_functions():
+            for nested_dim in range(1, 5):
+                data = gen_nested_list(1, nested_dim)
+
+                if func__ in ['log', 'log10', 'log2', 'rsqrt', 'sqrt']:
+                    data = nested_map(lambda x: x.abs(), data)
+                if func__ in ['acos', 'asin', 'erfinv', 'log1p']:
+                    data = nested_map(lambda x: x.clamp(min=0, max=1), data)
+                if func__ in ['mvlgamma']:
+                    data = nested_map(lambda x: x.clamp(min=1), data)
+
+                a1 = torch.nested_tensor(data)
+                a3 = torch.nested_tensor(data)
+                func_ = getattr(torch, func__)
+                method_ = getattr(torch.NestedTensor, func__)
+                method_inplace_ = getattr(torch.NestedTensor, func__ + "_")
+                if func__ in ['clamp']:
+                    def func(x, out=None):
+                        return func_(x, min=-1, max=1, out=out)
+
+                    def method(x): return method_(x, min=-1, max=1)
+
+                    def method_inplace(x): return method_inplace_(x, min=-1, max=1)
+                elif func__ in ['mvlgamma']:
+
+                    def func(x):
+                        return func_(x, p=2)
+
+                    def method(x): return method_(x, p=2)
+
+                    def method_inplace(x): return method_inplace_(x, p=2)
+                elif func__ in ['renorm']:
+
+                    def func(x, out=None):
+                        return func_(x, 2, 0, 1.0, out=out)
+
+                    def method(x):
+                        return method_(x, 2, 0, 1.0)
+
+                    def method_inplace(x): return method_inplace_(x, 2, 0, 1.0)
+                elif func__ in ['fmod']:
+
+                    def func(x, out=None):
+                        return func_(x, 0.3, out=out)
+
+                    def method(x): return method_(x, 0.3)
+
+                    def method_inplace(x): return method_inplace_(x, 0.3)
+                else:
+                    func = func_
+                    method = method_
+                    method_inplace = method_inplace_
+
+                a2 = torch.nested_tensor(nested_map(func, data))
+
+                if func__ not in ['mvlgamma']:
+                    func(a1, out=a3)
+                    self.assertTrue((func(a1) == a3).all())
+                self.assertTrue((func(a1) == a2).all())
+                self.assertTrue((method(a1) == a2).all())
+                self.assertTrue((method_inplace(a1) == a2).all())
+                self.assertTrue((a1 == a2).all())
 
     def test_binary(self):
         for func in torch.nested.codegen.extension.get_binary_functions():

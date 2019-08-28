@@ -15,6 +15,10 @@ DEBUG = False
 # Path is represented as a list of strings
 REGISTER_FUNCTIONS = {}
 
+# TODO: Write tests for everything
+# TODO: Revisit feature branches
+# TODO: Make sure 0.0.1 and 0.0.2 are covered
+
 
 def _gen_unbound_args_kwargs(args, kwargs):
     unbound_args = []
@@ -32,13 +36,21 @@ def _gen_unbound_args_kwargs(args, kwargs):
         else:
             unbound_kwargs[k] = v
 
+    # Should be first tensor argument not argument - but then raises questions of mixed tensor vs. nestedtensor etc.
     for i in range(len(args[0])):
         new_args = []
-        for ua in unbound_args:
-            new_args.append(ua[i])
+        for j in range(len(unbound_args)):
+            ua = unbound_args[j]
+            if torch.is_nested_tensor(args[j]):
+                new_args.append(ua[i])
+            else:
+                new_args.append(ua)
         new_kwargs = {}
         for k in kwargs.keys():
-            new_kwargs[k] = unbound_kwargs[k][i]
+            if is_nested_tensor(kwargs[k]):
+                new_kwargs[k] = unbound_kwargs[k][i]
+            else:
+                new_kwargs[k] = unbound_kwargs[k]
         yield (new_args, new_kwargs)
 
 
@@ -53,6 +65,7 @@ def _tensorwise(f):
     def decorator(*args, **kwargs):
 
         def _func(*args, **kwargs):
+            # TODO: Check if first tensor argument (not first argument) is tensor or nested tensor
             if torch.is_tensor(args[0]):
                 return f(*args, **kwargs)
             else:
@@ -274,11 +287,11 @@ def _verify_tensors(tensors):
     is_pinned = tensors[0].is_pinned()
     for tensor in tensors:
         if not (dim == tensor.dim() and
-                layout == tensor.layout
-                and device == tensor.device
-                and dtype == tensor.dtype
-                and requires_grad == tensor.requires_grad
-                and is_pinned == tensor.is_pinned()):
+                layout == tensor.layout and
+                device == tensor.device and
+                dtype == tensor.dtype and
+                requires_grad == tensor.requires_grad and
+                is_pinned == tensor.is_pinned()):
             raise ValueError("Each passed Tensor "
                              "must match in dim, layout, "
                              "device, dtype and requires_grad")
