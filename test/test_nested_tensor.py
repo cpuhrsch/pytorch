@@ -1,8 +1,29 @@
+import traceback
+import functools
+import pdb
+import sys
 import torch
 import unittest
 from common_utils import TestCase
 
 torch = torch.nested.monkey_patch(torch)
+
+
+def debug_on(*exceptions):
+    if not exceptions:
+        exceptions = (AssertionError, )
+
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except exceptions:
+                info = sys.exc_info()
+                traceback.print_exception(*info)
+                pdb.post_mortem(info[2])
+        return wrapper
+    return decorator
 
 
 def _shape_prod(shape_):
@@ -11,8 +32,6 @@ def _shape_prod(shape_):
     for s in shape:
         start = start * s
     return start
-
-# From torchaudio by jamarshon
 
 
 def random_float_tensor(seed, size, a=22695477, c=1, m=2 ** 32,
@@ -107,6 +126,7 @@ class TestNestedTensor(TestCase):
         self.assertTrue(not (a1 != a2).any())
         self.assertTrue(not (a1 == a3).any())
 
+    @debug_on
     def test_unary(self):
         for func in torch.nested.codegen.extension.get_unary_functions():
             data = [gen_float_tensor(1, (2, 3)) - 0.5,
@@ -115,10 +135,10 @@ class TestNestedTensor(TestCase):
                 data = list(map(lambda x: x.abs(), data))
             a1 = torch.nested_tensor(data)
             a2 = torch.nested_tensor(list(map(lambda x: getattr(torch, func)(x), data)))
-            self.assertTrue((getattr(torch, func)(a1) == a2).all())
-            self.assertTrue((getattr(a1, func)() == a2).all())
-            self.assertTrue((getattr(a1, func + "_")() == a2).all())
-            self.assertTrue((a1 == a2).all())
+            self.assertTrue(getattr(torch, func)(a1) == a2)
+            self.assertTrue(getattr(a1, func)() == a2)
+            self.assertTrue(getattr(a1, func + "_")() == a2)
+            self.assertTrue(a1 == a2)
 
     def test_binary(self):
         for func in torch.nested.codegen.extension.get_binary_functions():
@@ -135,74 +155,6 @@ class TestNestedTensor(TestCase):
             self.assertTrue((a3 == getattr(a1, func + "_")(a2)).all())
             self.assertTrue((a3 == a1).all())
 
-    def test_detach(self):
-        data = [gen_float_tensor(1, (10, 10)),
-                gen_float_tensor(2, (10, 10)),
-                gen_float_tensor(3, (10, 10))]
-        ones_data = [torch.ones(10, 10),
-                     torch.ones(10, 10),
-                     torch.ones(10, 10)]
-        # We don't support scalar arguments yet (broadcasting)
-        # This will be part of NestedTensor 0.0.3
-        twos_data = [torch.ones(10, 10) * 2,
-                     torch.ones(10, 10) * 2,
-                     torch.ones(10, 10) * 2]
-        fours_data = [torch.ones(10, 10) * 4,
-                      torch.ones(10, 10) * 4,
-                      torch.ones(10, 10) * 4]
-        ones = torch.nested_tensor(ones_data).to(torch.float)
-        twos = torch.nested_tensor(twos_data).to(torch.float)
-        fours = torch.nested_tensor(fours_data).to(torch.float)
-        x = torch.nested_tensor(data, requires_grad=True)
-        y = x + twos
-        y = y.detach()
-        z = y * fours + twos
-        self.assertFalse(y.requires_grad)
-        self.assertFalse(z.requires_grad)
-
-        x = torch.nested_tensor(data, requires_grad=True)
-        y = x * twos
-        y = y.detach()
-        self.assertFalse(y.requires_grad)
-        self.assertRaises(NotImplementedError, lambda: y.grad_fn)
-        z = x + y
-        z.sum().backward()
-
-        # This is an incorrect gradient, but we assume that's what the user
-        # wanted. detach() is an advanced option.
-        self.assertTrue((x.grad.data == ones).all())
-
-        # in-place detach
-        x = torch.nested_tensor(data, requires_grad=True)
-        y = torch.nested_tensor(data, requires_grad=True)
-        a = x * twos
-        (y + a).sum().backward(retain_graph=True)
-        a.detach_()
-        self.assertFalse(a.requires_grad)
-        (y + a).sum().backward()  # this won't backprop to x
-        self.assertTrue((x.grad.data == ones * twos).all())
-        self.assertTrue((y.grad.data == ones * twos).all())
-
-        # TODO: view semantics will be defined by NestedTensor 0.0.3 or 0.0.4
-        # in-place deatch on a view raises an exception
-        # view = x.narrow(0, 1, 4)
-        # self.assertRaisesRegex(RuntimeError, 'view', lambda: view.detach_())
-
-    def test_detach_base(self):
-        x = torch.nested_tensor([torch.randn(10, 10)], requires_grad=True)
-        x.detach_()
-        self.assertFalse(x.requires_grad)
-
 
 if __name__ == "__main__":
-    # unittest.main()
-    def _gen_nested_tensor():
-        tensors = []
-        num_tensors = 4
-        for i in range(num_tensors):
-            tensors.append(gen_float_tensor(i, (i + 1, 128, 128)))
-        return torch.nested_tensor(tensors)
-    num_nested_tensor = 3
-    nested_tensors = [_gen_nested_tensor() for _ in range(num_nested_tensor)]
-    nested_tensor = torch.nested_tensor(nested_tensors)
-    nested_tensor.cos_()
+    unittest.main()

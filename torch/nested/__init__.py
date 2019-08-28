@@ -10,21 +10,7 @@ from . import codegen
 # support for NestedTensor to torch.
 
 def monkey_patch(module):
-    module.is_nested_tensor = nested.is_nested_tensor
-    module.nested_tensor = nested.nested_tensor
-    module.NestedTensor = nested.NestedTensor
-    module.as_nested_tensor = nested.as_nested_tensor
-    module.tensor_mask_to_nested_tensor = nested.tensor_mask_to_nested_tensor
-
-    module, nested.NestedTensor = codegen.add_pointwise_unary_functions(module, nested.NestedTensor, nested._nary_gen())
-    module, nested.NestedTensor = codegen.add_pointwise_binary_functions(
-        module, nested.NestedTensor, nested._nary_gen())
-    module, nested.NestedTensor = codegen.add_pointwise_comparison_functions(
-        module, nested.NestedTensor, nested._nary_gen(torch.uint8))
-
-    module.mv = nested.mv
-    module.cat = nested.cat
-
+    module = nested.monkey_patch(module)
     return module
 
 

@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
 import numbers
+from functools import wraps
+# from .codegen import get_tensorwise_functions
+from . import codegen
 
 from . import masking
 
@@ -14,36 +17,161 @@ DEBUG = False
 # TODO: Nesting support for dim, improved wrapper decorator for cat, mv, etc.
 # TODO: Support nested lists and nested tuples for binary operations
 
-
 orig_cat = torch.cat
 
+# Stores path (e.g. torch.nn.lstm) -> new function (e.g. nested_cat)
+# Path is represented as a list of strings
+REGISTER_FUNCTIONS = {}
 
-def cat(*args, **kwargs):
-    if is_nested_tensor(args[0][0]):
-        # Assuming 1 level of nesting
-        dim = kwargs.get('dim', None) - 1
-        assert 'out' not in kwargs
-        ret = []
-        all_tensors = list(args[0][i]._tensors for i in range(len(args[0])))
-        for tensors in zip(*all_tensors):
-            ret.append(orig_cat(tensors, dim=dim))
-        return NestedTensor(ret)
+
+def _nested_apply(f):
+    @wraps(f)
+    def decorator(self, *args, **kwargs):
+        if not(torch.is_tensor(self) or is_nested_tensor(self)):
+            raise ValueError("First argument must be Tensor or NestedTensor")
+        if self.nested_dim == 1:
+            f(self, *args, **kwargs)
+        else:
+            for component in self.unbind():
+                f(component, *args, **kwargs)
+    return decorator
+
+
+def _gen_unbound_args_kwargs(args, kwargs):
+    unbound_args = [arg.unbind() for arg in args]
+    unbound_kwargs = {k: v.unbind() for (k, v) in kwargs.items()}
+    for i in range(len(args[0])):
+        new_args = []
+        for ua in unbound_args:
+            new_args.append(ua[i])
+        new_kwargs = {}
+        for k in kwargs.keys():
+            new_kwargs[k] = unbound_kwargs[k][i]
+        yield (new_args, new_kwargs)
+
+
+# The assumption is that f can handle a list of tensors
+# This is used to write tensor-wise functions
+# The resulting function accepts a multiple NestedTensors as arguments
+# and calls f tensor-wise
+def _nested_apply_return(f):
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        def _func(*args, **kwargs):
+            if torch.is_tensor(args[0]):
+                return f(*args, **kwargs)
+            else:
+                assert is_nested_tensor(args[0])
+                results = []
+                for local_args, local_kwargs in _gen_unbound_args_kwargs(args, kwargs):
+                    result = _func(*local_args, **local_kwargs)
+                    if result is None:
+                        continue
+                    results.append(result)
+                if len(results):
+                    return as_nested_tensor(results)
+        return _func(*args, **kwargs)
+    return decorator
+
+
+def _gen_nary_tensors(func):
+    @wraps(func)
+    def _nary_tensors(inputs):
+        out_tensor = func(*inputs)
+        if out_dtype is not None:
+            out_tensor = out_tensor.to(out_dtype)
+        return out_tensor
+    return _nary_tensors
+
+
+def _dispatch(cls):
+    def decorator(new_fn):
+
+        orig_fn = getattr(torch, new_fn.__name__)
+
+        @wraps(orig_fn)
+        def monkeyd(self, *args, **kwargs):
+            if isinstance(self, cls):
+                return new_fn(self, *args, **kwargs)
+            else:
+                return orig_fn(self, *args, **kwargs)
+
+        return monkeyd
+    return decorator
+
+
+def monkey_patch(module):
+    module.is_nested_tensor = is_nested_tensor
+    module.as_nested_tensor = as_nested_tensor
+    module.nested_tensor = nested_tensor
+    module.tensor_mask_to_nested_tensor = tensor_mask_to_nested_tensor
+
+    for function_name in codegen.get_tensorwise_functions():
+        setattr(module, function_name, _dispatch(NestedTensor)(_nested_apply_return(getattr(module, function_name))))
+
+    for function_name in codegen.get_tensorwise_functions():
+        setattr(NestedTensor, function_name,
+                _nested_apply_return(getattr(torch.Tensor, function_name)))
+        setattr(NestedTensor, function_name + '_',
+                _nested_apply_return(getattr(torch.Tensor, function_name + '_')))
+
+    for function_name in ['add', 'mul', 'sub', 'div']:
+        setattr(NestedTensor, "__" + function_name + '__',
+                _nested_apply_return(getattr(torch.Tensor, "__" + function_name + '__')))
+
+    for function_name in codegen.get_comparison_functions():
+        setattr(NestedTensor, "__" + function_name + '__',
+                _nested_apply_return(getattr(torch.Tensor, "__" + function_name + '__')))
+
+    module.NestedTensor = NestedTensor
+
+    # module.mv = mv
+    # module.cat = cat
+
+    return module
+
+
+def _check_meaningful_overwrite(cls, method_name):
+    class DefaultClass(object):
+        pass
+
+    if getattr(cls, method_name, False) and not getattr(DefaultClass, method_name, False):
+        raise Exception("WARNING: " + method_name + " already exists "
+                        "and not part of default class")
+
+
+# TODO: Needs manual nesting semantics
+@_dispatch(lambda a0: is_nested_tensor(a0[0]))
+def cat(orig_cat, nested_tensors, dim=None):
+    # Assuming 1 level of nesting
+    if dim is not None:
+        dim = dim - 1
+    ret = []
+    all_tensors = list(nested_tensors[0][i]._tensors for i in range(len(nested_tensors[0])))
+    for tensors in zip(*all_tensors):
+        ret.append(orig_cat(tensors, dim=dim))
+    return NestedTensor(ret)
+
+
+@_dispatch(lambda a0: is_nested_tensor(a0))
+def mv(orig_mv, matrices, vectors):
+    if matrices.nested_dim > 1:
+        ntdim = matrices.nested_dim
+        assert vectors.size()[:ntdim] == matrices.size()[:ntdim]
+        return as_nested_tensor([mv(m, v) for (m, v) in zip(matrices.unbind(), vectors.unbind())])
     else:
-        return orig_cat(*args, **kwargs)
+        return as_nested_tensor([orig_mv(m, v) for (m, v) in zip(matrices.unbind(), vectors.unbind())])
 
 
-orig_mv = torch.mv
+orig_stack = torch.stack
 
 
-def mv(*args, **kwargs):
+def stack(*args, **kwargs):
     if is_nested_tensor(args[0]):
-        # Assuming 1 level of nesting
-        ret = []
-        for tensor1, tensor2 in zip(args[0]._tensors, args[1]._tensors):
-            ret.append(orig_mv(tensor1, tensor2))
-        return NestedTensor(ret)
+        import pdb
+        pdb.set_trace()
     else:
-        return orig_mv(*args, **kwargs)
+        return orig_stack(*args, **kwargs)
 
 
 def is_nested_tensor(obj):
@@ -125,69 +253,13 @@ def as_nested_tensor(data, dtype=None, device=None):
     return ret
 
 
-def _nested_apply_return(f):
-    def decorator(self, *args, **kwargs):
-        if not(torch.is_tensor(self) or is_nested_tensor(self)):
-            raise ValueError("First argument must be Tensor or NestedTensor")
+def _nested_property(f):
+    @wraps(f)
+    def decorator(self):
         if self.nested_dim == 1:
-            return f(self, *args, **kwargs)
+            return f(self)
         else:
-            components = self.unbind()
-            if not all(components[0].nested_dim == component.nested_dim for component in components):
-                raise ValueError("All NestedTensors must have the same nested dimension")
-            return NestedTensor([f(component, *args, **kwargs) for component in components])
-    return decorator
-
-
-def _nested_apply(f):
-    def decorator(self, *args, **kwargs):
-        if not(torch.is_tensor(self) or is_nested_tensor(self)):
-            raise ValueError("First argument must be Tensor or NestedTensor")
-        if self.nested_dim == 1:
-            f(self, *args, **kwargs)
-        else:
-            for component in self.unbind():
-                f(component, *args, **kwargs)
-    return decorator
-
-
-def _nary_gen(out_dtype=None):
-    # Follows signature of torch nary functions
-    def _nary(*args, **kwargs):
-        func_name = args[0]
-        func = args[1]
-        inputs = args[2:]
-        out = kwargs.get('out', None)
-
-        def _nary_tensors(inputs, out):
-            if out is None:
-                out_tensor = func(*inputs)
-                if out_dtype is not None:
-                    out_tensor = out_tensor.to(out_dtype)
-                return out_tensor
-            else:
-                if out_dtype is not None:
-                    out = out.to(out_dtype)
-                func(*inputs, out=out)
-                return out
-
-        if torch.is_tensor(inputs[0]):
-            return _nary_tensors(inputs, out)
-        else:
-            unbound_inputs = [inp.unbind() for inp in inputs]
-            result = []
-            if out:
-                unbound_out = out.unbind()
-                for i in range(len(inputs[0])):
-                    result.append(_nary(*([func_name, func] + [unbound_inputs[j][i]
-                                                               for j in range(len(unbound_inputs))]), out=unbound_out[i]))
-            else:
-                for i in range(len(inputs[0])):
-                    result.append(_nary(*([func_name, func] + [unbound_inputs[j][i]
-                                                               for j in range(len(unbound_inputs))])))
-            return as_nested_tensor(result)
-
-    return _nary
+            return f(self.unbind()[0])
 
 
 @_nested_apply
@@ -204,11 +276,11 @@ def _verify_tensors(obj):
         is_pinned = tensors[0].is_pinned()
         for tensor in tensors:
             if not (dim == tensor.dim() and
-                    layout == tensor.layout and
-                    device == tensor.device and
-                    dtype == tensor.dtype and
-                    requires_grad == tensor.requires_grad and
-                    is_pinned == tensor.is_pinned()):
+                    layout == tensor.layout
+                    and device == tensor.device
+                    and dtype == tensor.dtype
+                    and requires_grad == tensor.requires_grad
+                    and is_pinned == tensor.is_pinned()):
                 raise ValueError("Each passed Tensor "
                                  "must match in dim, layout, "
                                  "device, dtype and requires_grad")
@@ -241,7 +313,8 @@ class NestedTensor(object):
         self._tensors = tensors
         _verify_tensors(self)
 
-    # TODO: Create level of nesting function from tuples
+    # Cannot be decorated as _nested_property since
+    # it's used for dispatch within the function
     @property
     def nested_dim(self):
         if torch.is_tensor(self._tensors[0]):
@@ -250,30 +323,35 @@ class NestedTensor(object):
             return (self._tensors[0]).nested_dim + 1
 
     @property
+    @_nested_property
     def dim(self):
         if DEBUG:
             _verify_tensors(self)
         return self._tensors[0].dim
 
     @property
+    @_nested_property
     def dtype(self):
         if DEBUG:
             _verify_tensors(self)
         return self._tensors[0].dtype
 
     @property
+    @_nested_property
     def layout(self):
         if DEBUG:
             _verify_tensors(self)
         return self._tensors[0].layout
 
     @property
+    @_nested_property
     def device(self):
         if DEBUG:
             _verify_tensors(self)
         return self._tensors[0].device
 
     @property
+    @_nested_property
     def requires_grad(self):
         if DEBUG:
             _verify_tensors(self)
@@ -340,11 +418,11 @@ class NestedTensor(object):
     # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
 
     def all(self):
-        return all(t.all() for t in self._tensors)
+        return all(t.all() for t in self.unbind())
 
     # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
     def any(self):
-        return any(t.any() for t in self._tensors)
+        return any(t.any() for t in self.unbind())
 
     # TODO: Not covered by RFC! NestedTensor 0.0.2 will talk about reductions.
     def sum(self, dim=None):
@@ -376,6 +454,7 @@ class NestedTensor(object):
     def clone(self):
         return NestedTensor(self.__apply(lambda x: x.clone()))
 
+    @_nested_property
     def numel(self):
         all_numel = 0
         for tensor in self._tensors:
