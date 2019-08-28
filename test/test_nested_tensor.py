@@ -93,6 +93,7 @@ class TestNestedTensor(TestCase):
             tensors[i].mul_(i + 2)
         for i in range(num_tensors):
             self.assertTrue((tensors[i] != nested_tensor._tensors[i]).all())
+        self.assertRaises(ValueError, lambda: torch.nested_tensor([]))
         self.assertRaises(ValueError, lambda: torch.nested_tensor(torch.tensor([3.0])))
 
     def test_nested_size(self):

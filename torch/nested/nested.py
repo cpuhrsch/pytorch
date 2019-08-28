@@ -16,22 +16,22 @@ DEBUG = False
 REGISTER_FUNCTIONS = {}
 
 
-def _nested_apply(f):
-    @wraps(f)
-    def decorator(self, *args, **kwargs):
-        if not(torch.is_tensor(self) or is_nested_tensor(self)):
-            raise ValueError("First argument must be Tensor or NestedTensor")
-        if self.nested_dim == 1:
-            f(self, *args, **kwargs)
-        else:
-            for component in self.unbind():
-                f(component, *args, **kwargs)
-    return decorator
-
-
 def _gen_unbound_args_kwargs(args, kwargs):
-    unbound_args = [arg.unbind() for arg in args]
-    unbound_kwargs = {k: v.unbind() for (k, v) in kwargs.items()}
+    unbound_args = []
+    for arg in args:
+        if is_nested_tensor(arg):
+            unbound_args.append(arg.unbind())
+        else:
+            unbound_args.append(arg)
+
+    unbound_kwargs = {}
+    for (k, v) in kwargs.items():
+        assert k not in unbound_kwargs
+        if is_nested_tensor(v):
+            unbound_kwargs[k] = v.unbind()
+        else:
+            unbound_kwargs[k] = v
+
     for i in range(len(args[0])):
         new_args = []
         for ua in unbound_args:
@@ -46,9 +46,12 @@ def _gen_unbound_args_kwargs(args, kwargs):
 # This is used to write tensor-wise functions
 # The resulting function accepts a multiple NestedTensors as arguments
 # and calls f tensor-wise
-def _nested_apply_return(f):
+# TODO: Write as flatten + reshape
+def _tensorwise(f):
+
     @wraps(f)
     def decorator(*args, **kwargs):
+
         def _func(*args, **kwargs):
             if torch.is_tensor(args[0]):
                 return f(*args, **kwargs)
@@ -64,16 +67,6 @@ def _nested_apply_return(f):
                     return as_nested_tensor(results)
         return _func(*args, **kwargs)
     return decorator
-
-
-def _gen_nary_tensors(func):
-    @wraps(func)
-    def _nary_tensors(inputs):
-        out_tensor = func(*inputs)
-        if out_dtype is not None:
-            out_tensor = out_tensor.to(out_dtype)
-        return out_tensor
-    return _nary_tensors
 
 
 def _dispatch(cls):
@@ -99,21 +92,31 @@ def monkey_patch(module):
     module.tensor_mask_to_nested_tensor = tensor_mask_to_nested_tensor
 
     for function_name in codegen.get_tensorwise_functions():
-        setattr(module, function_name, _dispatch(NestedTensor)(_nested_apply_return(getattr(module, function_name))))
+        setattr(module, function_name, _dispatch(NestedTensor)(_tensorwise(getattr(module, function_name))))
 
     for function_name in codegen.get_tensorwise_functions():
         setattr(NestedTensor, function_name,
-                _nested_apply_return(getattr(torch.Tensor, function_name)))
+                _tensorwise(getattr(torch.Tensor, function_name)))
         setattr(NestedTensor, function_name + '_',
-                _nested_apply_return(getattr(torch.Tensor, function_name + '_')))
+                _tensorwise(getattr(torch.Tensor, function_name + '_')))
+
+    for function_name in ['clone', 'detach', 'to']:
+        setattr(NestedTensor, function_name,
+                _tensorwise(getattr(torch.Tensor, function_name)))
 
     for function_name in ['add', 'mul', 'sub', 'div']:
         setattr(NestedTensor, "__" + function_name + '__',
-                _nested_apply_return(getattr(torch.Tensor, "__" + function_name + '__')))
+                _tensorwise(getattr(torch.Tensor, "__" + function_name + '__')))
 
     for function_name in codegen.get_comparison_functions():
         setattr(NestedTensor, "__" + function_name + '__',
-                _nested_apply_return(getattr(torch.Tensor, "__" + function_name + '__')))
+                _tensorwise(getattr(torch.Tensor, "__" + function_name + '__')))
+
+    NestedTensor.dim = _nested_property(lambda self: self.dim)
+    NestedTensor.dtype = _nested_property(lambda self: self.dtype)
+    NestedTensor.layout = _nested_property(lambda self: self.layout)
+    NestedTensor.device = _nested_property(lambda self: self.device)
+    NestedTensor.requires_grad = _nested_property(lambda self: self.requires_grad)
 
     module.NestedTensor = NestedTensor
 
@@ -250,44 +253,35 @@ def as_nested_tensor(data, dtype=None, device=None):
 
 
 def _nested_property(f):
+    @property
     @wraps(f)
     def decorator(self):
         if self.nested_dim == 1:
-            return f(self)
-        else:
-            return f(self.unbind()[0])
+            if DEBUG:
+                _verify_tensors(self)
+        return f(self.unbind()[0])
+    return decorator
 
 
-@_nested_apply
-def _verify_tensors(obj):
-    tensors = obj.unbind()
+def _verify_tensors(tensors):
     for tensor in tensors:
         assert torch.is_tensor(tensor)
-    if len(tensors):
-        dim = tensors[0].dim()
-        layout = tensors[0].layout
-        device = tensors[0].device
-        dtype = tensors[0].dtype
-        requires_grad = tensors[0].requires_grad
-        is_pinned = tensors[0].is_pinned()
-        for tensor in tensors:
-            if not (dim == tensor.dim() and
-                    layout == tensor.layout
-                    and device == tensor.device
-                    and dtype == tensor.dtype
-                    and requires_grad == tensor.requires_grad
-                    and is_pinned == tensor.is_pinned()):
-                raise ValueError("Each passed Tensor "
-                                 "must match in dim, layout, "
-                                 "device, dtype and requires_grad")
-    else:
-        # Carrying around information as member variables vs.
-        # checking one entry of the owned Tensors is annoying
-        # and error-prone. Carrying around an is_empty attribute
-        # to hide the fact that we carry around a list with a
-        # single empty Tensor is also annoying and error-prone.
-        # Both are not worth it for a minor feature.
-        raise ValueError("We do not support empty lists for now.")
+    dim = tensors[0].dim()
+    layout = tensors[0].layout
+    device = tensors[0].device
+    dtype = tensors[0].dtype
+    requires_grad = tensors[0].requires_grad
+    is_pinned = tensors[0].is_pinned()
+    for tensor in tensors:
+        if not (dim == tensor.dim() and
+                layout == tensor.layout
+                and device == tensor.device
+                and dtype == tensor.dtype
+                and requires_grad == tensor.requires_grad
+                and is_pinned == tensor.is_pinned()):
+            raise ValueError("Each passed Tensor "
+                             "must match in dim, layout, "
+                             "device, dtype and requires_grad")
 
 
 class NestedTensor(object):
@@ -306,9 +300,16 @@ class NestedTensor(object):
     #     requires_grad
     #     is_pinned
     def __init__(self, tensors):
+        if len(tensors) == 0:
+            # Carrying around information as member variables vs.
+            # checking one entry of the owned Tensors is annoying
+            # and error-prone. Carrying around an is_empty attribute
+            # to hide the fact that we carry around a list with a
+            # single empty Tensor is also annoying and error-prone.
+            # Both are not worth it for a minor feature.
+            raise ValueError("We do not support empty lists for now.")
         self._tensors = tensors
-        if DEBUG:
-            _verify_tensors(self)
+        _verify_tensors(self.flatten().unbind())
 
     # Cannot be decorated as _nested_property since
     # it's used for dispatch within the function
@@ -318,41 +319,6 @@ class NestedTensor(object):
             return 1
         else:
             return (self._tensors[0]).nested_dim + 1
-
-    @property
-    @_nested_property
-    def dim(self):
-        if DEBUG:
-            _verify_tensors(self)
-        return self._tensors[0].dim
-
-    @property
-    @_nested_property
-    def dtype(self):
-        if DEBUG:
-            _verify_tensors(self)
-        return self._tensors[0].dtype
-
-    @property
-    @_nested_property
-    def layout(self):
-        if DEBUG:
-            _verify_tensors(self)
-        return self._tensors[0].layout
-
-    @property
-    @_nested_property
-    def device(self):
-        if DEBUG:
-            _verify_tensors(self)
-        return self._tensors[0].device
-
-    @property
-    @_nested_property
-    def requires_grad(self):
-        if DEBUG:
-            _verify_tensors(self)
-        return self._tensors[0].requires_grad
 
     def __len__(self):
         return len(self._tensors)
@@ -379,9 +345,6 @@ class NestedTensor(object):
         for i in range(len(self)):
             self._tensors[i].add_(other._tensors[i])
         return self
-
-    def __apply(self, fn):
-        return [fn(tensor) for tensor in self._tensors]
 
     def nested_size(self, dim=None):
         if dim is not None:
@@ -436,22 +399,18 @@ class NestedTensor(object):
             else:
                 raise NotImplementedError("Reductions over NestedTensor dimension not defined")
 
-    # Tensor ops
-    def detach(self):
-        return NestedTensor(self.__apply(lambda x: x.detach()))
-
-    def clone(self):
-        return NestedTensor(self.__apply(lambda x: x.clone()))
-
-    @_nested_property
     def numel(self):
-        all_numel = 0
-        for tensor in self._tensors:
-            all_numel += tensor.numel()
-        return all_numel
+        return sum(tensor.numel() for tensor in self.flatten())
 
     def unbind(self):
         return tuple(self._tensors)
+
+    # TODO: Not covered by RFCs 0.0.1 or 0.0.2
+    def flatten(self):
+        if self.nested_dim == 1:
+            return self
+        else:
+            return as_nested_tensor(sum([t.flatten().unbind() for t in self.unbind()], ()))
 
     def to_tensor(self):
         if None in self.size():
