@@ -20,14 +20,13 @@ REGISTER_FUNCTIONS = {}
 # TODO: Make sure 0.0.1 and 0.0.2 are covered
 
 
-def _gen_unbound_args_kwargs(args, kwargs):
+def _gen_unbound_args_kwargs(*args, **kwargs):
     unbound_args = []
     for arg in args:
         if is_nested_tensor(arg):
             unbound_args.append(arg.unbind())
         else:
             unbound_args.append(arg)
-
     unbound_kwargs = {}
     for (k, v) in kwargs.items():
         assert k not in unbound_kwargs
@@ -36,7 +35,8 @@ def _gen_unbound_args_kwargs(args, kwargs):
         else:
             unbound_kwargs[k] = v
 
-    # Should be first tensor argument not argument - but then raises questions of mixed tensor vs. nestedtensor etc.
+    # Should be first tensor argument not argument
+    # but then raises questions of mixed tensor vs. nestedtensor etc.
     for i in range(len(args[0])):
         new_args = []
         for j in range(len(unbound_args)):
@@ -60,10 +60,8 @@ def _gen_unbound_args_kwargs(args, kwargs):
 # and calls f tensor-wise
 # TODO: Write as flatten + reshape
 def _tensorwise(f):
-
     @wraps(f)
     def decorator(*args, **kwargs):
-
         def _func(*args, **kwargs):
             # TODO: Check if first tensor argument (not first argument) is tensor or nested tensor
             if torch.is_tensor(args[0]):
@@ -71,7 +69,7 @@ def _tensorwise(f):
             else:
                 assert is_nested_tensor(args[0])
                 results = []
-                for local_args, local_kwargs in _gen_unbound_args_kwargs(args, kwargs):
+                for local_args, local_kwargs in _gen_unbound_args_kwargs(*args, **kwargs):
                     result = _func(*local_args, **local_kwargs)
                     if result is None:
                         continue
@@ -82,61 +80,23 @@ def _tensorwise(f):
     return decorator
 
 
-def _dispatch(cls):
+def _dispatch(dispatch_fn=None):
+    if dispatch_fn is None:
+        def dispatch_fn(x): return is_nested_tensor(x)
+
     def decorator(new_fn):
 
         orig_fn = getattr(torch, new_fn.__name__)
 
         @wraps(orig_fn)
         def monkeyd(self, *args, **kwargs):
-            if isinstance(self, cls):
+            if dispatch_fn(self):
                 return new_fn(self, *args, **kwargs)
             else:
                 return orig_fn(self, *args, **kwargs)
 
         return monkeyd
     return decorator
-
-
-def monkey_patch(module):
-    module.is_nested_tensor = is_nested_tensor
-    module.as_nested_tensor = as_nested_tensor
-    module.nested_tensor = nested_tensor
-    module.tensor_mask_to_nested_tensor = tensor_mask_to_nested_tensor
-
-    for function_name in codegen.get_tensorwise_functions():
-        setattr(module, function_name, _dispatch(NestedTensor)(_tensorwise(getattr(module, function_name))))
-
-    for function_name in codegen.get_tensorwise_functions():
-        setattr(NestedTensor, function_name,
-                _tensorwise(getattr(torch.Tensor, function_name)))
-        setattr(NestedTensor, function_name + '_',
-                _tensorwise(getattr(torch.Tensor, function_name + '_')))
-
-    for function_name in ['clone', 'detach', 'to']:
-        setattr(NestedTensor, function_name,
-                _tensorwise(getattr(torch.Tensor, function_name)))
-
-    for function_name in ['add', 'mul', 'sub', 'div']:
-        setattr(NestedTensor, "__" + function_name + '__',
-                _tensorwise(getattr(torch.Tensor, "__" + function_name + '__')))
-
-    for function_name in codegen.get_comparison_functions():
-        setattr(NestedTensor, "__" + function_name + '__',
-                _tensorwise(getattr(torch.Tensor, "__" + function_name + '__')))
-
-    NestedTensor.dim = _nested_property(lambda self: self.dim)
-    NestedTensor.dtype = _nested_property(lambda self: self.dtype)
-    NestedTensor.layout = _nested_property(lambda self: self.layout)
-    NestedTensor.device = _nested_property(lambda self: self.device)
-    NestedTensor.requires_grad = _nested_property(lambda self: self.requires_grad)
-
-    module.NestedTensor = NestedTensor
-
-    # module.mv = mv
-    # module.cat = cat
-
-    return module
 
 
 def _check_meaningful_overwrite(cls, method_name):
@@ -148,42 +108,62 @@ def _check_meaningful_overwrite(cls, method_name):
                         "and not part of default class")
 
 
-orig_cat = torch.cat
-
-# TODO: Needs manual nesting semantics
-
-
-@_dispatch(lambda a0: is_nested_tensor(a0[0]))
-def cat(orig_cat, nested_tensors, dim=None):
-    # Assuming 1 level of nesting
-    if dim is not None:
-        dim = dim - 1
-    ret = []
-    all_tensors = list(nested_tensors[0][i]._tensors for i in range(len(nested_tensors[0])))
-    for tensors in zip(*all_tensors):
-        ret.append(orig_cat(tensors, dim=dim))
-    return NestedTensor(ret)
+def set_nt_method(name, func):
+    _check_meaningful_overwrite(NestedTensor, name)
+    setattr(NestedTensor, name, func)
 
 
-@_dispatch(lambda a0: is_nested_tensor(a0))
-def mv(orig_mv, matrices, vectors):
+def monkey_patch(module):
+    module.is_nested_tensor = is_nested_tensor
+    module.as_nested_tensor = as_nested_tensor
+    module.nested_tensor = nested_tensor
+    module.tensor_mask_to_nested_tensor = tensor_mask_to_nested_tensor
+
+    for function_name in codegen.get_tensorwise_functions():
+        setattr(module, function_name, _dispatch()(_tensorwise(getattr(module, function_name))))
+
+    for function_name in codegen.get_tensorwise_functions():
+        set_nt_method(function_name,
+                      _tensorwise(getattr(torch.Tensor, function_name)))
+        set_nt_method(function_name + '_',
+                      _tensorwise(getattr(torch.Tensor, function_name + '_')))
+
+    for function_name in ['clone', 'detach', 'to']:
+        set_nt_method(function_name,
+                      _tensorwise(getattr(torch.Tensor, function_name)))
+
+    for function_name in ['add', 'mul', 'sub', 'div']:
+        set_nt_method("__" + function_name + '__',
+                      _tensorwise(getattr(torch.Tensor, "__" + function_name + '__')))
+
+    for function_name in codegen.get_comparison_functions():
+        set_nt_method("__" + function_name + '__',
+                      _tensorwise(getattr(torch.Tensor, "__" + function_name + '__')))
+
+    NestedTensor.dim = _nested_property(lambda self: self.dim)
+    NestedTensor.dtype = _nested_property(lambda self: self.dtype)
+    NestedTensor.layout = _nested_property(lambda self: self.layout)
+    NestedTensor.device = _nested_property(lambda self: self.device)
+    NestedTensor.requires_grad = _nested_property(lambda self: self.requires_grad)
+
+    module.NestedTensor = NestedTensor
+
+    module.mv = _tensorwise(torch.mv)
+
+    return module
+
+
+orig_mv = torch.mv
+
+
+@_dispatch()
+def mv(matrices, vectors):
     if matrices.nested_dim > 1:
         ntdim = matrices.nested_dim
         assert vectors.size()[:ntdim] == matrices.size()[:ntdim]
         return as_nested_tensor([mv(m, v) for (m, v) in zip(matrices.unbind(), vectors.unbind())])
     else:
         return as_nested_tensor([orig_mv(m, v) for (m, v) in zip(matrices.unbind(), vectors.unbind())])
-
-
-orig_stack = torch.stack
-
-
-def stack(*args, **kwargs):
-    if is_nested_tensor(args[0]):
-        import pdb
-        pdb.set_trace()
-    else:
-        return orig_stack(*args, **kwargs)
 
 
 def is_nested_tensor(obj):
@@ -445,6 +425,3 @@ class NestedTensor(object):
         mask = mask.sum(-1)
         mask = (mask > 0)
         return tensor, mask
-
-    def to(self, *args, **kwargs):
-        return NestedTensor(self.__apply(lambda x: x.to(*args, **kwargs)))

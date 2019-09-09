@@ -82,23 +82,113 @@ def gen_nested_list(seed, nested_dim):
     if nested_dim == 1:
         for i in range(num_tensors):
             ran = gen_random_int((seed * nested_dim + seed) * (1024 * i), low=1, high=10)
-            tensors.append(gen_float_tensor(ran, (ran + 1, 128, 128)))
+            tensors.append(gen_float_tensor(ran, (ran + 1, 17, 5)))
     else:
-        tensors.append(gen_nested_list(num_tensors * seed, nested_dim - 1))
+        for i in range(num_tensors):
+            tensors.append(gen_nested_list(num_tensors * seed, nested_dim - 1))
     return tensors
 
 
 def nested_map(fn, data):
     if isinstance(data, list):
-        for d in data:
-            return nested_map(fn, d)
+        return [nested_map(fn, d) for d in data]
     else:
-        return [fn(d) for d in data]
+        return fn(data)
 
 
 def gen_nested_tensor(seed, nested_dim):
 
     return torch.nested_tensor(gen_nested_list(seed, nested_dim))
+
+
+def _gen_test_unary(func__, nested_dim, device):
+    def _test_unary(self):
+        data = gen_nested_list(1, nested_dim)
+        data = nested_map(lambda x: x.to(device), data)
+
+        if func__ in ['log', 'log10', 'log2', 'rsqrt', 'sqrt']:
+            data = nested_map(lambda x: x.abs(), data)
+        if func__ in ['acos', 'asin', 'erfinv', 'log1p']:
+            data = nested_map(lambda x: x.clamp(min=0, max=1), data)
+        if func__ in ['mvlgamma']:
+            data = nested_map(lambda x: x.clamp(min=1), data)
+
+        a1 = torch.nested_tensor(data)
+        a3 = torch.nested_tensor(data)
+        func_ = getattr(torch, func__)
+        method_ = getattr(torch.NestedTensor, func__)
+        method_inplace_ = getattr(torch.NestedTensor, func__ + "_")
+        if func__ in ['clamp']:
+            def func(x, out=None):
+                return func_(x, min=-1, max=1, out=out)
+
+            def method(x): return method_(x, min=-1, max=1)
+
+            def method_inplace(x): return method_inplace_(x, min=-1, max=1)
+        elif func__ in ['mvlgamma']:
+
+            def func(x):
+                return func_(x, p=2)
+
+            def method(x): return method_(x, p=2)
+
+            def method_inplace(x): return method_inplace_(x, p=2)
+        elif func__ in ['renorm']:
+
+            def func(x, out=None):
+                return func_(x, 2, 0, 1.0, out=out)
+
+            def method(x):
+                return method_(x, 2, 0, 1.0)
+
+            def method_inplace(x): return method_inplace_(x, 2, 0, 1.0)
+        elif func__ in ['fmod']:
+
+            def func(x, out=None):
+                return func_(x, 0.3, out=out)
+
+            def method(x): return method_(x, 0.3)
+
+            def method_inplace(x): return method_inplace_(x, 0.3)
+        else:
+            func = func_
+            method = method_
+            method_inplace = method_inplace_
+
+        a2 = torch.nested_tensor(nested_map(func, data))
+
+        self.assertTrue(a1.nested_dim == a2.nested_dim)
+        self.assertTrue(a2.nested_dim == a3.nested_dim)
+
+        if func__ not in ['mvlgamma']:
+            func(a1, out=a3)
+            self.assertTrue((func(a1) == a3).all())
+        self.assertTrue((func(a1) == a2).all())
+        self.assertTrue((method(a1) == a2).all())
+        self.assertTrue((method_inplace(a1) == a2).all())
+        self.assertTrue((a1 == a2).all())
+    return _test_unary
+
+
+def _gen_test_binary(func):
+    def _test_binary(self):
+        a = gen_float_tensor(1, (2, 3))
+        b = gen_float_tensor(2, (2, 3))
+        c = gen_float_tensor(3, (2, 3))
+        # The constructor is supposed to copy!
+        a1 = torch.nested_tensor([a, b])
+        a2 = torch.nested_tensor([b, c])
+        a3 = torch.nested_tensor([getattr(torch, func)(a, b),
+                                  getattr(torch, func)(b, c)])
+        self.assertTrue((a3 == getattr(torch, func)(a1, a2)).all())
+        self.assertTrue((a3 == getattr(a1, func)(a2)).all())
+        self.assertTrue((a3 == getattr(a1, func + "_")(a2)).all())
+        self.assertTrue((a3 == a1).all())
+    return _test_binary
+
+
+class DynamicClassBase(TestCase):
+    longMessage = True
 
 
 class TestNestedTensor(TestCase):
@@ -122,6 +212,10 @@ class TestNestedTensor(TestCase):
             self.assertTrue((tensors[i] != nested_tensor._tensors[i]).all())
         self.assertRaises(ValueError, lambda: torch.nested_tensor([]))
         self.assertRaises(ValueError, lambda: torch.nested_tensor(torch.tensor([3.0])))
+        self.assertRaises(ValueError, lambda: torch.nested_tensor(torch.nested_tensor([torch.tensor([3.0])])))
+        self.assertRaises(ValueError, lambda: torch.nested_tensor(
+            [torch.tensor([2.0]), torch.nested_tensor([torch.tensor([3.0])])]))
+        self.assertRaises(ValueError, lambda: torch.nested_tensor(4.0))
 
     def test_nested_size(self):
         a = torch.nested_tensor([torch.rand(1, 2), torch.rand(2, 3), torch.rand(4, 5)])
@@ -153,7 +247,6 @@ class TestNestedTensor(TestCase):
         self.assertTrue(not (a1 != a2).any())
         self.assertTrue(not (a1 == a3).any())
 
-    @debug_on()
     def test_nested_dim(self):
         nt = torch.nested_tensor([torch.tensor(3)])
         self.assertTrue(nt.nested_dim == 1)
@@ -161,87 +254,22 @@ class TestNestedTensor(TestCase):
             nt = gen_nested_tensor(i, i)
             self.assertTrue(nt.nested_dim == i)
 
-    # TODO: Make nested test
+
+class TestTensorMask(TestCase):
+
     @debug_on()
-    def test_unary(self):
-        for func__ in torch.nested.codegen.extension.get_unary_functions():
-            for nested_dim in range(1, 5):
-                data = gen_nested_list(1, nested_dim)
-
-                if func__ in ['log', 'log10', 'log2', 'rsqrt', 'sqrt']:
-                    data = nested_map(lambda x: x.abs(), data)
-                if func__ in ['acos', 'asin', 'erfinv', 'log1p']:
-                    data = nested_map(lambda x: x.clamp(min=0, max=1), data)
-                if func__ in ['mvlgamma']:
-                    data = nested_map(lambda x: x.clamp(min=1), data)
-
-                a1 = torch.nested_tensor(data)
-                a3 = torch.nested_tensor(data)
-                func_ = getattr(torch, func__)
-                method_ = getattr(torch.NestedTensor, func__)
-                method_inplace_ = getattr(torch.NestedTensor, func__ + "_")
-                if func__ in ['clamp']:
-                    def func(x, out=None):
-                        return func_(x, min=-1, max=1, out=out)
-
-                    def method(x): return method_(x, min=-1, max=1)
-
-                    def method_inplace(x): return method_inplace_(x, min=-1, max=1)
-                elif func__ in ['mvlgamma']:
-
-                    def func(x):
-                        return func_(x, p=2)
-
-                    def method(x): return method_(x, p=2)
-
-                    def method_inplace(x): return method_inplace_(x, p=2)
-                elif func__ in ['renorm']:
-
-                    def func(x, out=None):
-                        return func_(x, 2, 0, 1.0, out=out)
-
-                    def method(x):
-                        return method_(x, 2, 0, 1.0)
-
-                    def method_inplace(x): return method_inplace_(x, 2, 0, 1.0)
-                elif func__ in ['fmod']:
-
-                    def func(x, out=None):
-                        return func_(x, 0.3, out=out)
-
-                    def method(x): return method_(x, 0.3)
-
-                    def method_inplace(x): return method_inplace_(x, 0.3)
-                else:
-                    func = func_
-                    method = method_
-                    method_inplace = method_inplace_
-
-                a2 = torch.nested_tensor(nested_map(func, data))
-
-                if func__ not in ['mvlgamma']:
-                    func(a1, out=a3)
-                    self.assertTrue((func(a1) == a3).all())
-                self.assertTrue((func(a1) == a2).all())
-                self.assertTrue((method(a1) == a2).all())
-                self.assertTrue((method_inplace(a1) == a2).all())
-                self.assertTrue((a1 == a2).all())
-
-    def test_binary(self):
-        for func in torch.nested.codegen.extension.get_binary_functions():
-            a = gen_float_tensor(1, (2, 3))
-            b = gen_float_tensor(2, (2, 3))
-            c = gen_float_tensor(3, (2, 3))
-            # The constructor is supposed to copy!
-            a1 = torch.nested_tensor([a, b])
-            a2 = torch.nested_tensor([b, c])
-            a3 = torch.nested_tensor([getattr(torch, func)(a, b),
-                                      getattr(torch, func)(b, c)])
-            self.assertTrue((a3 == getattr(torch, func)(a1, a2)).all())
-            self.assertTrue((a3 == getattr(a1, func)(a2)).all())
-            self.assertTrue((a3 == getattr(a1, func + "_")(a2)).all())
-            self.assertTrue((a3 == a1).all())
+    def test_simple(self):
+        assert 1 == 2
 
 
 if __name__ == "__main__":
+    globals()['TestUnary'] = type('TestUnary', (DynamicClassBase,), {})
+    for func__ in torch.nested.codegen.extension.get_unary_functions():
+        for nested_dim in range(1, 5):
+            for device in ['cpu', 'cuda']:
+                setattr(TestUnary, "test_{0}_nested_dim_{1}_{2}".format(
+                    func__, nested_dim, device), _gen_test_unary(func__, nested_dim, device))
+    globals()['TestBinary'] = type('TestBinary', (DynamicClassBase,), {})
+    for func in torch.nested.codegen.extension.get_binary_functions():
+        setattr(TestBinary, "test_{0}".format(func), _gen_test_binary(func))
     unittest.main()
