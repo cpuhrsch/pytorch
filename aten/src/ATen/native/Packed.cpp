@@ -32,6 +32,7 @@ namespace native {
 
 PackedTensor add_packed(PackedTensor input, Tensor input2){
   std::cout << "HEEE" << std::endl;
+  return input;
 }
 
 }
