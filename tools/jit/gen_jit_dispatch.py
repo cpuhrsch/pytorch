@@ -46,6 +46,7 @@ TYPE_MAP = {
     'QScheme': 'QScheme',
     'Scalar?': 'Scalar?',
     'Tensor': 'Tensor',
+    'PackedTensor': 'PackedTensor',
     'Tensor?': 'Tensor?',
     'TensorList': 'Tensor[]',
     # this appears in return values instead of TensorList
@@ -108,6 +109,7 @@ FROM_IVALUE = {
     'ScalarType': '{}.toScalarType()',
     'ScalarType?': '{}.toOptional<ScalarType>()',
     'Tensor': '{}.toTensor()',
+    'PackedTensor': '{}.toPackedTensor()',
     'Tensor?': 'toOptionalTensor({})',
     'Tensor?[]': 'toListOfOptionalTensor({})',
     'TensorList': '{}.toTensorListRef()',
