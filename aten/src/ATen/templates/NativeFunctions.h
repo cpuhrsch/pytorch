@@ -20,13 +20,12 @@ class Scalar;
 namespace at {
 struct Generator;
 class Tensor;
+class PackedTensor
 struct Type;
 } // namespace at
 
 namespace at {
 namespace native {
-class PackedTensor {
-};
 
 // These functions are defined in native/TensorFactories.cpp.
 #define TENSOR(T, S)                                                          \

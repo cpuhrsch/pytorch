@@ -34,6 +34,9 @@ class Tensor;
 
 namespace at {
 
+class PackedTensor {
+};
+
 class Tensor;
 using TensorList = ArrayRef<Tensor>;
 
