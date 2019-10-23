@@ -59,6 +59,8 @@ DECLARE_DISPATCH(void(*)(TensorIterator&, const int64_t), polygamma_stub);
 DECLARE_DISPATCH(void(*)(TensorIterator&, Scalar a, Scalar b), clamp_stub);
 DECLARE_DISPATCH(void(*)(Tensor&, const Tensor&, int64_t, bool, Generator *), multinomial_stub);
 
+Tensor add_packed(const PackedTensor& input, const Tensor& input2);
+
 // Missing unary functions
 // digamma
 // lgamma

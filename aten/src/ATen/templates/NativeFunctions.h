@@ -21,6 +21,7 @@ namespace at {
 struct Generator;
 class Tensor;
 struct Type;
+class PackedTensor;
 } // namespace at
 
 namespace at {

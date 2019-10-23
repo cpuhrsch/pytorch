@@ -334,5 +334,12 @@ DEFINE_DISPATCH(tan_stub);
 DEFINE_DISPATCH(tanh_stub);
 DEFINE_DISPATCH(trunc_stub);
 DEFINE_DISPATCH(lgamma_stub);
+
+Tensor add_packed(const PackedTensor& input, const Tensor& input2){
+  std::cout << "HEEE" << std::endl;
+  Tensor a = at::rand({1, 2});
+  return a;
+}
+
 }
 } // namespace at
