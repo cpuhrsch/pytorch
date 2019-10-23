@@ -21,11 +21,12 @@ namespace at {
 struct Generator;
 class Tensor;
 struct Type;
-class PackedTensor;
 } // namespace at
 
 namespace at {
 namespace native {
+class PackedTensor {
+};
 
 // These functions are defined in native/TensorFactories.cpp.
 #define TENSOR(T, S)                                                          \

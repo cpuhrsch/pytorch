@@ -20,7 +20,6 @@
 namespace at {
 
 class Tensor;
-class PackedTensor;
 
 class CAFFE2_API Context {
  public:
