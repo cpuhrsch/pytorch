@@ -291,6 +291,8 @@ def create_python_bindings(python_functions, has_self, is_module=False):
     unpack_methods = {
         'const Tensor &': 'tensor',
         'Tensor &': 'tensor',
+        'const PackedTensor &': 'packedtensor',
+        'PackedTensor &': 'packedtensor',
         'Generator *': 'generator',
         'Storage &': 'storage',
         'const Type &': 'scalartype',
@@ -398,6 +400,10 @@ def create_python_bindings(python_functions, has_self, is_module=False):
                 dispatch_type = 'Tensor'
             elif dispatch_type == 'const Device &':
                 dispatch_type = 'c10::optional<int32_t>'
+            elif dispatch_type == 'PackedTensor':
+                dispatch_type = 'const PackedTensor &'
+            elif dispatch_type == 'PackedTensor &':
+                dispatch_type = 'PackedTensor'
             formal = '{} {}'.format(dispatch_type, name)
             return expr, formal
 

@@ -352,6 +352,11 @@ inline IValue toIValue(
       guardAgainstNamedTensor<autograd::Variable>(var);
       return var;
     }
+    case TypeKind::PackedTensorType: {
+      throw py::cast_error(
+            c10::str("Cannot cast ", py::str(obj), " to PackedTensor"));
+      return {};
+    }
     case TypeKind::FloatType:
       return py::cast<double>(obj);
     case TypeKind::IntType:
