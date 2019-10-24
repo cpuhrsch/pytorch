@@ -35,6 +35,10 @@ class Tensor;
 namespace at {
 
 class PackedTensor {
+public:
+  bool defined() const {
+    return true;
+  }
 };
 
 class Tensor;

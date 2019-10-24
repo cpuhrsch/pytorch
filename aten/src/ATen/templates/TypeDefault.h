@@ -21,6 +21,8 @@ namespace at {
 class Tensor;
 using TensorList = ArrayRef<Tensor>;
 
+class PackedTensor;
+
 class Context;
 struct Generator;
 

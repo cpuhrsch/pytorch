@@ -365,6 +365,8 @@ DYNAMIC_TYPE = {
 NATIVE_DYNAMIC_TYPE = {
     'Tensor &': 'Tensor',
     'const Tensor &': 'Tensor',
+    'PackedTensor &': 'PackedTensor',
+    'const PackedTensor &': 'PackedTensor',
 }
 
 TYPE_RETURN = {
@@ -1079,6 +1081,7 @@ def create_generic(top_env, declarations):
                 # type: (bool) -> Dict[str, str]
                 return {
                     'Tensor': 'const Tensor &' if const else 'Tensor &',
+                    'PackedTensor': 'const PackedTensor &' if const else 'PackedTensor &',
                     'Type': 'const Type &' if const else 'Type &',
                     'TensorOptions': 'const TensorOptions &' if const else 'TensorOptions &',
                     'TensorList': 'TensorList',

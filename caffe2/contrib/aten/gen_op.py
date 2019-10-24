@@ -137,6 +137,11 @@ def supports(o, factory_methods):
             print("Skipping {} Because of Arg: {} ({}) ".format(
                   o['name'], arg['type'], arg['dynamic_type']))
             return False
+
+    # skip anything related to PackedTensor
+    if 'PackedTensor' in o['schema_string']:
+        return False
+
     return True
 
 

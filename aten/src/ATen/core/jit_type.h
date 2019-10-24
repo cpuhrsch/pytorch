@@ -31,6 +31,7 @@ using OptNameList = c10::optional<std::vector<std::string>>;
 
 #define C10_FORALL_TYPES(_) \
   _(AnyType)                \
+  _(PackedTensorType)             \
   _(TensorType)             \
   _(TupleType)              \
   _(ListType)               \
@@ -367,6 +368,27 @@ struct CAFFE2_API VaryingShape {
 
  private:
   c10::optional<ListOfOptionalInts> dims_;
+};
+
+struct PackedTensorType;
+using PackedTensorTypePtr = std::shared_ptr<PackedTensorType>;
+// This type represents a single PackedTensor with a specific size
+struct CAFFE2_API PackedTensorType : public Type {
+public:
+  bool operator==(const Type& rhs) const override {
+    if (rhs.kind() != kind()) {
+      return false;
+    }
+    return true;
+  }
+  static PackedTensorTypePtr create(const at::PackedTensor& t) {
+    return PackedTensorTypePtr(new PackedTensorType(t));
+  }
+  std::string str() const override;
+private:
+   PackedTensorType(const at::PackedTensor &packed_tensor)
+     : Type(TypeKind::PackedTensorType)
+   {}
 };
 
 using VaryingStrides = VaryingShape;

@@ -15,6 +15,7 @@
 
 namespace torch { namespace autograd {
 
+using at::PackedTensor;
 using at::Tensor;
 using at::Scalar;
 using at::ScalarType;
