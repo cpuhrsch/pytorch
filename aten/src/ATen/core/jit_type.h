@@ -384,7 +384,11 @@ public:
   static PackedTensorTypePtr create(const at::PackedTensor& t) {
     return PackedTensorTypePtr(new PackedTensorType(t));
   }
-  std::string str() const override;
+  std::string str() const override {
+    std::stringstream ss;
+    ss << "[PackedTensor]";
+    return ss.str();
+  }
 private:
    PackedTensorType(const at::PackedTensor &packed_tensor)
      : Type(TypeKind::PackedTensorType)
