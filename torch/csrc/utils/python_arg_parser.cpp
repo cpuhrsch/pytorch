@@ -18,6 +18,7 @@
 namespace torch {
 
 static std::unordered_map<std::string, ParameterType> type_map = {
+  {"PackedTensor", ParameterType::PACKEDTENSOR},
   {"Tensor", ParameterType::TENSOR},
   {"Scalar", ParameterType::SCALAR},
   {"int64_t", ParameterType::INT64},
@@ -269,6 +270,10 @@ void FunctionParameter::set_default_str(const std::string& str) {
     allow_none = true;
   }
   if (type_ == ParameterType::TENSOR) {
+    if (str != "None") {
+      throw std::runtime_error("default value for Tensor must be none, got: " + str);
+    }
+  } else if (type_ == ParameterType::PACKEDTENSOR) {
     if (str != "None") {
       throw std::runtime_error("default value for Tensor must be none, got: " + str);
     }
