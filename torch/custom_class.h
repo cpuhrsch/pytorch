@@ -51,8 +51,7 @@ detail::types<void, Types...> init() { return detail::types<void, Types...>{}; }
 // - Constructing `torch::jit::class_<Foo>` registers `Foo` in Python and
 // Torchscript, and puts it under `torch.classes.Foo` in Python.
 // - torch::jit::class_<Foo>.def("method1", &Foo::method1) does some template
-// metaprogramming to introspect the function types and register the operator
-// for use in Torchscript.
+// metaprogramming to introspect the function types and register the operator// for use in Torchscript.
 // - torch::jit::class_<Foo>.def(torch::jit::init<int64_t, int64_t>()) registers
 // the Foo(int, int) constructor.
 // see test/custom_operator/classes.cpp and
@@ -77,6 +76,7 @@ class class_ {
     // (I think)?
     qualClassName = topModule + "." + parentModule + "." + className;
 
+    std::cout << "HEEEEEEE" << std::endl;
     auto obj = py::module::import("torch").attr(parentModule.c_str());
     pyClass = py::class_<CurClass>(obj, className.c_str());
     pyClass->attr("qualified_name") = py::str(qualClassName);
