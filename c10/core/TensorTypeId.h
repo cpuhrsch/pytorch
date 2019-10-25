@@ -42,14 +42,16 @@ enum class TensorTypeId : uint8_t {
   SparseCPUTensorId, // PyTorch only
   SparseCUDATensorId, // PyTorch only
 
-  NestedTensorId,
-
   // WARNING! If you add more "wrapper" style tensor ids (tensor
   // ids which don't get kernels directly defined in native_functions.yaml;
   // examples are tracing or profiling) here, you need to also adjust
   // legacyExtractTypeId in c10/core/TensorTypeId.h to mask them out.
 
   VariableTensorId,
+
+  // NestedTensors use Variables and need to their own autograd support
+  // for some custom operations.
+  NestedTensorId,
 
   // TESTING: This is intended to be a generic testing tensor type id.
   // Don't use it for anything real; its only acceptible use is within a single
