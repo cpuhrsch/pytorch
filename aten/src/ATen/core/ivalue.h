@@ -39,7 +39,7 @@ struct Object;
 
 #define TORCH_FORALL_TAGS(_) \
   _(None) \
-  _(PackedTensor) \
+  _(NestedTensor) \
   _(Tensor) \
   _(Double) \
   _(Int) \
@@ -128,12 +128,12 @@ struct CAFFE2_API IValue final {
   // While some of these accessors could be generated through templates,
   // we prefer to write them manually for clarity
 
-  IValue(at::PackedTensor t)
-  : tag(Tag::PackedTensor), is_intrusive_ptr(t.defined())  {
+  IValue(at::NestedTensor t)
+  : tag(Tag::NestedTensor), is_intrusive_ptr(t.defined())  {
   }
-  bool isPackedTensor() const { return Tag::PackedTensor == tag; }
-  at::PackedTensor toPackedTensor() &&;
-  at::PackedTensor toPackedTensor() const &;
+  bool isNestedTensor() const { return Tag::NestedTensor == tag; }
+  at::NestedTensor toNestedTensor() &&;
+  at::NestedTensor toNestedTensor() const &;
 
   // Tensor
   IValue(at::Tensor t)

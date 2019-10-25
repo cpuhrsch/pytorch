@@ -147,7 +147,7 @@ ${name}(${py_formal_args})""")
 # to add an appropriate wrap() overload in torch/csrc/autograd/utils/wrap_outputs.h.
 SUPPORTED_RETURN_TYPES = {
     'Tensor',
-    'PackedTensor',
+    'NestedTensor',
     'std::tuple<Tensor,Tensor>',
     'std::tuple<Tensor,Tensor,Tensor>',
     'std::tuple<Tensor,Tensor,Tensor,Tensor>',
@@ -291,8 +291,8 @@ def create_python_bindings(python_functions, has_self, is_module=False):
     unpack_methods = {
         'const Tensor &': 'tensor',
         'Tensor &': 'tensor',
-        'const PackedTensor &': 'packedtensor',
-        'PackedTensor &': 'packedtensor',
+        'const NestedTensor &': 'nestedtensor',
+        'NestedTensor &': 'nestedtensor',
         'Generator *': 'generator',
         'Storage &': 'storage',
         'const Type &': 'scalartype',
@@ -400,10 +400,10 @@ def create_python_bindings(python_functions, has_self, is_module=False):
                 dispatch_type = 'Tensor'
             elif dispatch_type == 'const Device &':
                 dispatch_type = 'c10::optional<int32_t>'
-            elif dispatch_type == 'PackedTensor':
-                dispatch_type = 'const PackedTensor &'
-            elif dispatch_type == 'PackedTensor &':
-                dispatch_type = 'PackedTensor'
+            elif dispatch_type == 'NestedTensor':
+                dispatch_type = 'const NestedTensor &'
+            elif dispatch_type == 'NestedTensor &':
+                dispatch_type = 'NestedTensor'
             formal = '{} {}'.format(dispatch_type, name)
             return expr, formal
 

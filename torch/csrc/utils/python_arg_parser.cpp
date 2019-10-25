@@ -18,7 +18,7 @@
 namespace torch {
 
 static std::unordered_map<std::string, ParameterType> type_map = {
-  {"PackedTensor", ParameterType::PACKEDTENSOR},
+  {"NestedTensor", ParameterType::NESTEDTENSOR},
   {"Tensor", ParameterType::TENSOR},
   {"Scalar", ParameterType::SCALAR},
   {"int64_t", ParameterType::INT64},

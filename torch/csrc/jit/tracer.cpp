@@ -447,7 +447,7 @@ void addInputs(Node* n, const char* name, const std::string& value) {
 void addInputs(Node* n, const char* name, const at::Tensor& value) {
   n->addInput(getValueTrace(value));
 }
-void addInputs(Node* n, const char* name, const at::PackedTensor& value) {
+void addInputs(Node* n, const char* name, const at::NestedTensor& value) {
   std::cout << "PACKEDTENSOR DOESNT HAVE TRACER SUPPORT";
   n->addInput(getValueTrace(value));
 }

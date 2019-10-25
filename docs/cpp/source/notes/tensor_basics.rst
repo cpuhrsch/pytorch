@@ -76,7 +76,7 @@ CUDA accessors
 .. code-block:: cpp
 
   __global__ void packed_accessor_kernel(
-      PackedTensorAccessor64<float, 2> foo,
+      NestedTensorAccessor64<float, 2> foo,
       float* trace) {
     int i=threadIdx.x
     atomicAdd(trace, foo[i][i])
@@ -90,8 +90,8 @@ CUDA accessors
 
   packed_accessor_kernel<<<1, 12>>>(foo_a, &trace);
 
-In addition to ``PackedTensorAccessor64`` and ``packed_accessor64`` there are
-also the corresponding ``PackedTensorAccessor32`` and ``packed_accessor32``
+In addition to ``NestedTensorAccessor64`` and ``packed_accessor64`` there are
+also the corresponding ``NestedTensorAccessor32`` and ``packed_accessor32``
 which use 32-bit integers for indexing. This can be quite a bit faster on CUDA
 but may lead to overflows in the indexing calculations.
 

@@ -117,7 +117,7 @@ def type_to_python(typename, size=None):
         'BoolTensor': 'Tensor',
         'IndexTensor': 'Tensor',
         'Tensor': 'Tensor',
-        'PackedTensor': 'PackedTensor',
+        'NestedTensor': 'NestedTensor',
         'MemoryFormat': 'memory_format',
         'IntArrayRef': '_size',
         'IntArrayRef[]': 'Union[_int, _size]',

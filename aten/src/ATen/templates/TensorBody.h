@@ -34,7 +34,7 @@ class Tensor;
 
 namespace at {
 
-class PackedTensor {
+class NestedTensor {
 public:
   bool defined() const {
     return true;

@@ -77,7 +77,7 @@
 namespace torch {
 
 enum class ParameterType {
-  PACKEDTENSOR, TENSOR, SCALAR, INT64, DOUBLE, COMPLEX, TENSOR_LIST, INT_LIST, GENERATOR,
+  NESTEDTENSOR, TENSOR, SCALAR, INT64, DOUBLE, COMPLEX, TENSOR_LIST, INT_LIST, GENERATOR,
   BOOL, STORAGE, PYOBJECT, SCALARTYPE, LAYOUT, MEMORY_FORMAT, DEVICE, STRING,
   DIMNAME, DIMNAME_LIST, QSCHEME
 };
@@ -122,7 +122,7 @@ struct PythonArgs {
   const FunctionSignature& signature;
   PyObject** args;
 
-  inline at::PackedTensor packedtensor(int i);
+  inline at::NestedTensor NESTEDTENSOR(int i);
   inline at::Tensor tensor(int i);
   inline at::Scalar scalar(int i);
   inline at::Scalar scalarWithDefault(int i, at::Scalar default_scalar);
@@ -223,8 +223,8 @@ inline PythonArgs PythonArgParser::parse(PyObject* args, PyObject* kwargs, Parse
   return raw_parse(args, kwargs, dst.args);
 }
 
-inline at::PackedTensor PythonArgs::packedtensor(int i) {
-  return at::PackedTensor();
+inline at::NestedTensor PythonArgs::NESTEDTENSOR(int i) {
+  return at::NestedTensor();
 }
 
 inline at::Tensor PythonArgs::tensor(int i) {

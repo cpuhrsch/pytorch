@@ -352,9 +352,9 @@ inline IValue toIValue(
       guardAgainstNamedTensor<autograd::Variable>(var);
       return var;
     }
-    case TypeKind::PackedTensorType: {
+    case TypeKind::NestedTensorType: {
       throw py::cast_error(
-            c10::str("Cannot cast ", py::str(obj), " to PackedTensor"));
+            c10::str("Cannot cast ", py::str(obj), " to NestedTensor"));
       return {};
     }
     case TypeKind::FloatType:

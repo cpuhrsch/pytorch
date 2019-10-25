@@ -20,7 +20,7 @@ class Scalar;
 namespace at {
 struct Generator;
 class Tensor;
-class PackedTensor;
+class NestedTensor;
 struct Type;
 } // namespace at
 

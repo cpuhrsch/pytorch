@@ -31,7 +31,7 @@ using OptNameList = c10::optional<std::vector<std::string>>;
 
 #define C10_FORALL_TYPES(_) \
   _(AnyType)                \
-  _(PackedTensorType)             \
+  _(NestedTensorType)             \
   _(TensorType)             \
   _(TupleType)              \
   _(ListType)               \
@@ -370,10 +370,10 @@ struct CAFFE2_API VaryingShape {
   c10::optional<ListOfOptionalInts> dims_;
 };
 
-struct PackedTensorType;
-using PackedTensorTypePtr = std::shared_ptr<PackedTensorType>;
-// This type represents a single PackedTensor with a specific size
-struct CAFFE2_API PackedTensorType : public Type {
+struct NestedTensorType;
+using NestedTensorTypePtr = std::shared_ptr<NestedTensorType>;
+// This type represents a single NestedTensor with a specific size
+struct CAFFE2_API NestedTensorType : public Type {
 public:
   bool operator==(const Type& rhs) const override {
     if (rhs.kind() != kind()) {
@@ -381,21 +381,21 @@ public:
     }
     return true;
   }
-  static PackedTensorTypePtr create(const at::PackedTensor& t) {
-    return PackedTensorTypePtr(new PackedTensorType(t));
+  static NestedTensorTypePtr create(const at::NestedTensor& t) {
+    return NestedTensorTypePtr(new NestedTensorType(t));
   }
   std::string str() const override {
     std::stringstream ss;
-    ss << "[PackedTensor]";
+    ss << "[NestedTensor]";
     return ss.str();
   }
-  static PackedTensorTypePtr get();
+  static NestedTensorTypePtr get();
 private:
-   PackedTensorType(const at::PackedTensor &packed_tensor)
-     : Type(TypeKind::PackedTensorType)
+   NestedTensorType(const at::NestedTensor &packed_tensor)
+     : Type(TypeKind::NestedTensorType)
    {}
-   PackedTensorType()
-     : Type(TypeKind::PackedTensorType)
+   NestedTensorType()
+     : Type(TypeKind::NestedTensorType)
    {}
 };
 

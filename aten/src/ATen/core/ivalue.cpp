@@ -30,8 +30,8 @@ TypePtr IValue::type() const {
       return NoneType::get();
     case Tag::Tensor:
       return TensorType::create(toTensor());
-    case Tag::PackedTensor:
-      return PackedTensorType::create(toPackedTensor());
+    case Tag::NestedTensor:
+      return NestedTensorType::create(toNestedTensor());
     case Tag::Double:
       return FloatType::get();
     case Tag::Int:
@@ -127,8 +127,8 @@ std::ostream& operator<<(std::ostream & out, const IValue & v) {
       return out << v.toNone();
     case IValue::Tag::Tensor:
       return out << v.toTensor();
-    case IValue::Tag::PackedTensor:
-      return out << v.toPackedTensor();
+    case IValue::Tag::NestedTensor:
+      return out << v.toNestedTensor();
     case IValue::Tag::Double: {
       double d = v.toDouble();
       int c = std::fpclassify(d);
@@ -221,7 +221,7 @@ static bool CompareKeys(const std::pair<IValue, IValue>& aWrap,
     return a.toDouble() < b.toDouble();
   } else if (a.isTensor() && b.isTensor()) {
     return a.toTensor().unsafeGetTensorImpl() < b.toTensor().unsafeGetTensorImpl();
-  } else if (a.isPackedTensor() && b.isPackedTensor()) {
+  } else if (a.isNestedTensor() && b.isNestedTensor()) {
     return true;
   }
   AT_ERROR("Illegal dict key");

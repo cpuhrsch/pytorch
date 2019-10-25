@@ -82,13 +82,13 @@ inline c10::intrusive_ptr<ivalue::Object> IValue::toObject() const & {
   AT_ASSERT(isObject(), "Expected Object but got ", tagKind());
   return toIntrusivePtr<ivalue::Object>();
 }
-inline at::PackedTensor IValue::toPackedTensor() && {
-  AT_ASSERT(isPackedTensor(), "Expected PackedTensor but got ", tagKind());
-  return at::PackedTensor();
+inline at::NestedTensor IValue::toNestedTensor() && {
+  AT_ASSERT(isNestedTensor(), "Expected NestedTensor but got ", tagKind());
+  return at::NestedTensor();
 }
-inline at::PackedTensor IValue::toPackedTensor() const & {
-  AT_ASSERT(isPackedTensor(), "Expected PackedTensor but got ", tagKind());
-  return at::PackedTensor();
+inline at::NestedTensor IValue::toNestedTensor() const & {
+  AT_ASSERT(isNestedTensor(), "Expected NestedTensor but got ", tagKind());
+  return at::NestedTensor();
 }
 inline at::Tensor IValue::toTensor() && {
   AT_ASSERT(isTensor(), "Expected Tensor but got ", tagKind());

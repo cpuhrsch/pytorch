@@ -138,8 +138,8 @@ def supports(o, factory_methods):
                   o['name'], arg['type'], arg['dynamic_type']))
             return False
 
-    # skip anything related to PackedTensor
-    if 'PackedTensor' in o['schema_string']:
+    # skip anything related to NestedTensor
+    if 'NestedTensor' in o['schema_string']:
         return False
 
     return True

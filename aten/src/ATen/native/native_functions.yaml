@@ -6885,4 +6885,4 @@
     CPU: im2col_backward_cpu
     CUDA: im2col_backward_cuda
 
-- func: add_packed(PackedTensor input, Tensor input2) -> Tensor
+- func: add_packed(NestedTensor input, Tensor input2) -> Tensor

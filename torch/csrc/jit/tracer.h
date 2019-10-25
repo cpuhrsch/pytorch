@@ -232,7 +232,7 @@ TORCH_API void addInputs(
     const char* name,
     const c10::optional<at::Scalar>& value);
 TORCH_API void addInputs(Node* n, const char* name, const at::Tensor& value);
-TORCH_API void addInputs(Node* n, const char* name, const at::PackedTensor& value);
+TORCH_API void addInputs(Node* n, const char* name, const at::NestedTensor& value);
 TORCH_API void addInputs(Node* n, const char* name, at::IntArrayRef value);
 TORCH_API void addInputs(
     Node* n,

@@ -38,8 +38,8 @@ const char* toString(TensorTypeId t) {
       return "ComplexCPUTensorId";
     case TensorTypeId::ComplexCUDATensorId:
       return "ComplexCUDATensorId";
-    case TensorTypeId::PackedTensorId:
-      return "PackedTensorId";
+    case TensorTypeId::NestedTensorId:
+      return "NestedTensorId";
     case TensorTypeId::VariableTensorId:
       return "VariableTensorId";
     case TensorTypeId::TESTING_ONLY_GenericModeTensorId:
