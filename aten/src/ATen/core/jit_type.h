@@ -389,8 +389,12 @@ public:
     ss << "[PackedTensor]";
     return ss.str();
   }
+  static PackedTensorTypePtr get();
 private:
    PackedTensorType(const at::PackedTensor &packed_tensor)
+     : Type(TypeKind::PackedTensorType)
+   {}
+   PackedTensorType()
      : Type(TypeKind::PackedTensorType)
    {}
 };

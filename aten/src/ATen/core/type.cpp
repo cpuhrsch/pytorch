@@ -70,6 +70,10 @@ AnyTypePtr AnyType::get() {
   return value;
 }
 
+PackedTensorTypePtr PackedTensorType::get() {
+  return PackedTensorTypePtr(new PackedTensorType());
+}
+
 TensorTypePtr TensorType::get() {
   static auto value = TensorType::create(
       {},

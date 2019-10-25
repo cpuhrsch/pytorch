@@ -22,6 +22,7 @@ using c10::NumberType;
 using c10::OptionalType;
 using c10::StringType;
 using c10::Symbol;
+using c10::PackedTensorType;
 using c10::TensorType;
 using c10::TupleType;
 using c10::VarType;
@@ -196,6 +197,10 @@ std::pair<TypePtr, c10::optional<AliasInfo>> SchemaTypeParser::parseType() {
   } else if (L.cur().kind == TK_IDENT && L.cur().text() == "Tensor") {
     L.next();
     value = TensorType::get();
+    alias_info = parseAliasAnnotation();
+  } else if (L.cur().kind == TK_IDENT && L.cur().text() == "PackedTensor") {
+    L.next();
+    value = PackedTensorType::get();
     alias_info = parseAliasAnnotation();
   } else if (L.cur().kind == TK_IDENT && L.cur().text() == "Dict") {
     L.next();
