@@ -34,13 +34,6 @@ class Tensor;
 
 namespace at {
 
-class NestedTensor {
-public:
-  bool defined() const {
-    return true;
-  }
-};
-
 class Tensor;
 using TensorList = ArrayRef<Tensor>;
 
