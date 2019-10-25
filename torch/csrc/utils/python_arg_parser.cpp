@@ -273,9 +273,9 @@ void FunctionParameter::set_default_str(const std::string& str) {
     if (str != "None") {
       throw std::runtime_error("default value for Tensor must be none, got: " + str);
     }
-  } else if (type_ == ParameterType::PACKEDTENSOR) {
+  } else if (type_ == ParameterType::NESTEDTENSOR) {
     if (str != "None") {
-      throw std::runtime_error("default value for Tensor must be none, got: " + str);
+      throw std::runtime_error("default value for NestedTensor must be none, got: " + str);
     }
   } else if (type_ == ParameterType::INT64) {
     default_int = atol(str.c_str());
