@@ -122,7 +122,7 @@ struct PythonArgs {
   const FunctionSignature& signature;
   PyObject** args;
 
-  inline at::NestedTensor NESTEDTENSOR(int i);
+  inline at::NestedTensor nestedtensor(int i);
   inline at::Tensor tensor(int i);
   inline at::Scalar scalar(int i);
   inline at::Scalar scalarWithDefault(int i, at::Scalar default_scalar);
@@ -223,7 +223,7 @@ inline PythonArgs PythonArgParser::parse(PyObject* args, PyObject* kwargs, Parse
   return raw_parse(args, kwargs, dst.args);
 }
 
-inline at::NestedTensor PythonArgs::NESTEDTENSOR(int i) {
+inline at::NestedTensor PythonArgs::nestedtensor(int i) {
   return at::NestedTensor();
 }
 
