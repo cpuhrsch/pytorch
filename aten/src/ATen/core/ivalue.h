@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/core/TensorBody.h>
+#include <ATen/NestedTensor.h>
 #include <ATen/core/blob.h>
 #include <c10/util/C++17.h>
 #include <c10/util/intrusive_ptr.h>
