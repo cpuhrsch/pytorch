@@ -1,44 +1,64 @@
+#include <torch/csrc/nested_tensor/python_nested_tensor.h>
+
 #include <cassert>
 #include <climits>
 #include <cstring>
 #include <iostream>
 #include <iterator>
 #include <list>
-#include <torch/script.h>
-#include <torch/custom_class.h>
 #include <pybind11/pybind11.h>
+#include <torch/script.h>
 
-using namespace std;
+#include <torch/csrc/Dtype.h>
+#include <torch/csrc/DynamicTypes.h>
+#include <torch/csrc/Exceptions.h>
+#include <torch/csrc/Layout.h>
+
+#include <pybind11/pybind11.h>
+#include <structmember.h>
+
+#include <torch/csrc/Dtype.h>
+#include <torch/csrc/DynamicTypes.h>
+#include <torch/csrc/Exceptions.h>
+#include <torch/csrc/Layout.h>
+#include <torch/csrc/autograd/generated/VariableType.h>
+#include <torch/csrc/autograd/python_variable.h>
+#include <torch/csrc/autograd/utils/wrap_outputs.h>
+#include <torch/csrc/autograd/variable.h>
+#include <torch/csrc/utils/cuda_enabled.h>
+#include <torch/csrc/utils/cuda_lazy_init.h>
+#include <torch/csrc/utils/python_strings.h>
+#include <torch/csrc/utils/tensor_new.h>
+#include <torch/csrc/utils/tensor_types.h>
+
+#include <ATen/ATen.h>
+
+#include <sstream>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 namespace py = pybind11;
 
-struct NestedTensor : torch::jit::CustomClassHolder {
-  int x, y;
-  NestedTensor(): x(0), y(0){}
-  NestedTensor(int x_, int y_) : x(x_), y(y_) {}
-  int64_t info() {
-    return this->x * this->y;
-  }
-  int64_t add(int64_t z) {
-    return (x+y)*z;
-  }
-  void increment(int64_t z) {
-    this->x+=z;
-    this->y+=z;
-  }
-  int64_t combine(c10::intrusive_ptr<NestedTensor> b) {
-    return this->info() + b->info();
-  }
-  ~NestedTensor() {
-    // std::cout<<"Destroying object with values: "<<x<<' '<<y<<std::endl;
-  }
-};
+namespace torch {
 
-static auto test = torch::jit::class_<NestedTensor>("NestedTensor")
-                    .def(torch::jit::init<int64_t, int64_t>())
-                    // .def(torch::jit::init<>())
-                    .def("info", &NestedTensor::info)
-                    .def("increment", &NestedTensor::increment)
-                    // .def("add", &NestedTensor::add);
-                    .def("combine", &NestedTensor::combine)
-                    ;
+namespace nested_tensor {
+
+using namespace at;
+using namespace torch::autograd;
+
+void initialize_python_bindings() { py_bind_nestedtensor(); }
+
+static void py_bind_nestedtensor() {
+  C10_LOG_API_USAGE_ONCE("tensor_list.python.import");
+  auto nestedtensor_module =
+      THPObjectPtr(PyImport_ImportModule("torch.nestedtensor"));
+  if (!nestedtensor_module) {
+    throw python_error();
+  }
+
+  auto m = py::handle(nestedtensor_module).cast<py::module>();
+  py::class_<at::NestedTensor>(m, "NestedTensor");
+}
+}
+}
