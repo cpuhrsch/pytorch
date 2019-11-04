@@ -47,7 +47,7 @@ namespace nested_tensor {
 using namespace at;
 using namespace torch::autograd;
 
-struct PyTensorType {
+struct PyNestedTensorType {
   PyTypeObject py_type;
   THPDtype* dtype;
   THPLayout* layout;
@@ -69,24 +69,25 @@ struct PyTensorType {
   }
 };
 
-static_assert(std::is_standard_layout<PyTensorType>::value, "PyTensorType must be standard layout");
+static_assert(std::is_standard_layout<PyNestedTensorType>::value, "PyNestedTensorType must be standard layout");
 
 // This is always an instance of VariableType
-static PyTensorType* default_tensor_type;
+// TODO: Applies to NestedTensor?
+static PyNestedTensorType* default_tensor_type;
 
-static void py_bind_tensor_types(const std::vector<PyTensorType>& tensor_types);
+static void py_bind_nested_tensor_types(const std::vector<PyNestedTensorType>& nested_tensor_types);
 
-static TypeError unavailable_type(const PyTensorType& type) {
+static TypeError unavailable_type(const PyNestedTensorType& type) {
   return TypeError("type %s not available. Torch not compiled with CUDA enabled.", type.name);
 }
 
 static PyObject* NestedTensor_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
   HANDLE_TH_ERRORS
-  auto& tensor_type = *((PyTensorType*)type);
-  if (tensor_type.is_cuda && !torch::utils::cuda_enabled()) {
-    throw unavailable_type(tensor_type);
+  auto& nested_tensor_type = *((PyNestedTensorType*)type);
+  if (nested_tensor_type.is_cuda && !torch::utils::cuda_enabled()) {
+    throw unavailable_type(nested_tensor_type);
   }
-  return THPVariable_Wrap(torch::utils::legacy_tensor_ctor(tensor_type.get_type_id(), tensor_type.get_scalar_type(), args, kwargs));
+  return THPNestedTensor_Wrap(torch::utils::nested_tensor_ctor(nested_tensor_type.get_type_id(), nested_tensor_type.get_scalar_type(), args, kwargs));
   END_HANDLE_TH_ERRORS
 }
 
