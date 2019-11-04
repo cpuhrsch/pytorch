@@ -23,6 +23,7 @@ namespace at {
 
 class NestedTensor {
 public:
+  NestedTensor(){};
   bool defined() const {
     return true;
   }

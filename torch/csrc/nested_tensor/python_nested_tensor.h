@@ -9,7 +9,5 @@ namespace nested_tensor {
 
 void initialize_python_bindings();
 
-static void py_bind_nestedtensor();
-
 } // namespace nestedtensor
 } // namespace torch
