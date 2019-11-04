@@ -698,6 +698,7 @@ PyObject* initModule() {
   THPQScheme_init(module);
   THPDevice_init(module);
   ASSERT_TRUE(THPVariable_initModule(module));
+  ASSERT_TRUE(THPNestedTensor_initModule(module));
   ASSERT_TRUE(THPFunction_initModule(module));
   ASSERT_TRUE(THPEngine_initModule(module));
   // NOTE: We need to be able to access OperatorExportTypes from ONNX for use in
