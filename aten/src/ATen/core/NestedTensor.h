@@ -23,10 +23,15 @@ namespace at {
 
 class NestedTensor {
 public:
-  NestedTensor(){};
+  NestedTensor() {};
   bool defined() const {
     return true;
   }
+  const NestedTensor& getIntrusivePtr() const {
+    return self_impl;
+  }
+private:
+  const NestedTensor& self_impl;
 };
 
 } // namespace at

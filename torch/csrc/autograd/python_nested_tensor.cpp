@@ -51,18 +51,18 @@ static const char* VOLATILE_WARNING =
 
 // Creates a new Python object for a Variable. The Variable must not already
 // have a PyObject* associated with it.
-static PyObject* THPVariable_NewWithVar(PyTypeObject* type, Variable var)
+static PyObject* THPNestedTensor_NewWithVar(PyTypeObject* type, NestedTensor var)
 {
   PyObject* obj = type->tp_alloc(type, 0);
   if (obj) {
-    auto v = (THPVariable*) obj;
-    new (&v->cdata) Variable(std::move(var));
+    auto v = (THPNestedTensor*) obj;
+    new (&v->cdata) NestedTensor(std::move(var));
     v->cdata.set_pyobj(obj);
   }
   return obj;
 }
 
-PyObject * THPVariable_Wrap(Variable var)
+PyObject * THPNestedTensor_Wrap(NestedTensor var)
 {
   if (!var.defined()) {
     Py_RETURN_NONE;
@@ -73,20 +73,20 @@ PyObject * THPVariable_Wrap(Variable var)
     return obj;
   }
 
-  return THPVariable_NewWithVar((PyTypeObject *)THPVariableClass, std::move(var));
+  return THPNestedTensor_NewWithVar((PyTypeObject *)THPNestedTensorClass, std::move(var));
 }
 
-static int THPVariable_traverse(THPVariable *self, visitproc visit, void *arg)
+static int THPNestedTensor_traverse(THPNestedTensor *self, visitproc visit, void *arg)
 {
   Py_VISIT(self->backward_hooks);
-  // We don't want to traverse the grad_fn, even if the Variable owns it and the
+  // We don't want to traverse the grad_fn, even if the NestedTensor owns it and the
   // shared pointer's use count is 1. This is because we would need to treat
   // the grad_fn as part of the Python state and hold the GIL sometimes when
   // grad_fn's shared_ptr is copied, otherwise a race condition with the Python
   // GC could occur. Holding the GIL when the shared_ptr is copied adds
   // undesirable complexity/overhead.
   //
-  // When hooks, a Variable, and its grad_fn are involved in a Python reference
+  // When hooks, a NestedTensor, and its grad_fn are involved in a Python reference
   // cycle, because we're not traversing the grad_fn, the reference cycle will
   // in fact leak.
   //
@@ -103,15 +103,15 @@ static int THPVariable_traverse(THPVariable *self, visitproc visit, void *arg)
   return 0;
 }
 
-static int THPVariable_clear(THPVariable *self)
+static int THPNestedTensor_clear(THPNestedTensor *self)
 {
   Py_CLEAR(self->backward_hooks);
   if (self->cdata.defined()) {
     if (auto grad_acc = self->cdata.try_get_grad_accumulator()) {
       grad_acc->pre_hooks().clear();
     }
-    // We must clear the pyobj field in the base C++ Variable, to ensure
-    // that if we attempt to pass the Variable to Python, we don't
+    // We must clear the pyobj field in the base C++ NestedTensor, to ensure
+    // that if we attempt to pass the NestedTensor to Python, we don't
     // attempt to reuse the (now-dead) PyObject.
     //
     // One non-obvious consequence of this: if you have a tensor x, you
@@ -129,25 +129,25 @@ static int THPVariable_clear(THPVariable *self)
   return 0;
 }
 
-static void THPVariable_dealloc(THPVariable* self)
+static void THPNestedTensor_dealloc(THPNestedTensor* self)
 {
   PyObject_GC_UnTrack(self);
-  THPVariable_clear(self);
-  self->cdata.~Variable();
+  THPNestedTensor_clear(self);
+  self->cdata.~NestedTensor();
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static PyObject *THPVariable_pynew(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+static PyObject *THPNestedTensor_pynew(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
   HANDLE_TH_ERRORS
   jit::tracer::warn("torch.Tensor", jit::tracer::WARN_CONSTRUCTOR);
   auto tensor = torch::utils::legacy_tensor_ctor(torch::tensors::get_default_tensor_type_id(), torch::tensors::get_default_scalar_type(), args, kwargs);
-  return THPVariable_NewWithVar(type, std::move(tensor));
+  return THPNestedTensor_NewWithVar(type, std::move(tensor));
   END_HANDLE_TH_ERRORS
 }
 
 // Instantiates a subclass of torch.Tensor. Used by nn.Parameter()
-static PyObject* THPVariable_make_subclass(PyObject* _ignored, PyObject* args, PyObject* kwargs) {
+static PyObject* THPNestedTensor_make_subclass(PyObject* _ignored, PyObject* args, PyObject* kwargs) {
   HANDLE_TH_ERRORS
   static PythonArgParser parser({
     "_make_subclass(PyObject* cls, Tensor data, bool require_grad=False)",
@@ -158,7 +158,7 @@ static PyObject* THPVariable_make_subclass(PyObject* _ignored, PyObject* args, P
   if (!PyType_Check(cls)) {
     throw TypeError("cls must be a type (got %s)", Py_TYPE(cls)->tp_name);
   }
-  auto data = as_variable_ref(r.tensor(1)).detach();
+  auto data = as_NestedTensor_ref(r.tensor(1)).detach();
   // We set `data`'s `allow_tensor_metadata_change` to true here, because we want to
   // allow the following use case for backward compatibility:
   //
@@ -170,22 +170,22 @@ static PyObject* THPVariable_make_subclass(PyObject* _ignored, PyObject* args, P
   // ```
   data.unsafeGetTensorImpl()->set_allow_tensor_metadata_change(true);
   auto var = data.set_requires_grad(r.toBool(2));
-  return THPVariable_NewWithVar((PyTypeObject*)cls, std::move(var));
+  return THPNestedTensor_NewWithVar((PyTypeObject*)cls, std::move(var));
   END_HANDLE_TH_ERRORS
 }
 
 typedef PyObject *(*getter)(PyObject *, void *);
 typedef int (*setter)(PyObject *, PyObject *, void *);
 
-PyObject *THPVariable_get_T(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_T(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& var = self->cdata;
-  return THPVariable_Wrap(var.numpy_T());
+  return THPNestedTensor_Wrap(var.numpy_T());
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_get_cdata(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_cdata(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& var = self->cdata;
@@ -193,7 +193,7 @@ PyObject *THPVariable_get_cdata(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_get_version(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_version(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& var = self->cdata;
@@ -201,7 +201,7 @@ PyObject *THPVariable_get_version(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_get_grad_fn(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_grad_fn(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& var = self->cdata;
@@ -212,7 +212,7 @@ PyObject *THPVariable_get_grad_fn(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-static int THPVariable_set_grad_fn(THPVariable *self, PyObject *obj, void *unused)
+static int THPNestedTensor_set_grad_fn(THPNestedTensor *self, PyObject *obj, void *unused)
 {
   HANDLE_TH_ERRORS
   THPUtils_assertRet(-1, obj, "Deletion of _grad_fn not allowed. Detach tensor instead!");
@@ -222,42 +222,42 @@ static int THPVariable_set_grad_fn(THPVariable *self, PyObject *obj, void *unuse
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
-static PyObject *THPVariable_is_leaf(THPVariable *self, void *unused)
+static PyObject *THPNestedTensor_is_leaf(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   return PyBool_FromLong(!self->cdata.grad_fn());
   END_HANDLE_TH_ERRORS
 }
 
-static PyObject * THPVariable_get_data(THPVariable *self, void *unused)
+static PyObject * THPNestedTensor_get_data(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
-  auto var = self->cdata.variable_data();
-  return THPVariable_Wrap(var);
+  auto var = self->cdata.NestedTensor_data();
+  return THPNestedTensor_Wrap(var);
   END_HANDLE_TH_ERRORS
 }
 
-int THPVariable_set_data(THPVariable *self, PyObject *data, void *unused)
+int THPNestedTensor_set_data(THPNestedTensor *self, PyObject *data, void *unused)
 {
   HANDLE_TH_ERRORS
   THPUtils_assertRet(-1, data, "Deleting tensor data is not allowed. Delete tensor instead!");
-  if (!THPVariable_Check(data)) {
-    throw torch::TypeError("Variable data has to be a tensor, but got %s", Py_TYPE(data)->tp_name);
+  if (!THPNestedTensor_Check(data)) {
+    throw torch::TypeError("NestedTensor data has to be a tensor, but got %s", Py_TYPE(data)->tp_name);
   }
 
-  self->cdata.set_data(THPVariable_Unpack(data));
+  self->cdata.set_data(THPNestedTensor_Unpack(data));
   return 0;
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
-PyObject *THPVariable_get_grad(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_grad(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
-  return THPVariable_Wrap(self->cdata.grad());
+  return THPNestedTensor_Wrap(self->cdata.grad());
   END_HANDLE_TH_ERRORS
 }
 
-int THPVariable_set_grad(THPVariable *self, PyObject *py_grad, void *unused)
+int THPNestedTensor_set_grad(THPNestedTensor *self, PyObject *py_grad, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& var = self->cdata;
@@ -266,12 +266,12 @@ int THPVariable_set_grad(THPVariable *self, PyObject *py_grad, void *unused)
     return 0;
   }
 
-  THPUtils_assertRet(-1, THPVariable_Check(py_grad),
-      "expected Variable or None (got %s)", THPUtils_typename(py_grad));
-  THPUtils_assertRet(-1, self != (THPVariable*)py_grad,
-      "can't assign Variable as its own grad");
+  THPUtils_assertRet(-1, THPNestedTensor_Check(py_grad),
+      "expected NestedTensor or None (got %s)", THPUtils_typename(py_grad));
+  THPUtils_assertRet(-1, self != (THPNestedTensor*)py_grad,
+      "can't assign NestedTensor as its own grad");
 
-  auto& grad = ((THPVariable*)py_grad)->cdata;
+  auto& grad = ((THPNestedTensor*)py_grad)->cdata;
   bool gradIsSparse = (var.dtype() == grad.dtype() &&
                        var.device().type() == grad.device().type() &&
                        grad.layout() == kSparse);
@@ -289,19 +289,19 @@ int THPVariable_set_grad(THPVariable *self, PyObject *py_grad, void *unused)
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
-PyObject *THPVariable_get_volatile(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_volatile(THPNestedTensor *self, void *unused)
 {
-  const char* msg = "volatile was removed (Variable.volatile is always False)";
+  const char* msg = "volatile was removed (NestedTensor.volatile is always False)";
   PyErr_WarnEx(PyExc_UserWarning, msg, 1);
   Py_RETURN_FALSE;
 }
 
-int THPVariable_set_volatile(THPVariable *self, PyObject *obj, void *unused)
+int THPNestedTensor_set_volatile(THPNestedTensor *self, PyObject *obj, void *unused)
 {
   return PyErr_WarnEx(PyExc_UserWarning, VOLATILE_WARNING, 1);
 }
 
-PyObject *THPVariable_get_output_nr(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_output_nr(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   const auto output_nr = static_cast<long>(self->cdata.output_nr());
@@ -309,14 +309,14 @@ PyObject *THPVariable_get_output_nr(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_get_requires_grad(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_requires_grad(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   return PyBool_FromLong(self->cdata.requires_grad());
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_get_ndim(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_ndim(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   return PyInt_FromLong(self->cdata.dim());
@@ -324,7 +324,7 @@ PyObject *THPVariable_get_ndim(THPVariable *self, void *unused)
 }
 
 #ifdef BUILD_NAMEDTENSOR
-PyObject *THPVariable_get_names(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_names(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   // The long-term plan is to return a list of (python) torch.Dimname.
@@ -346,7 +346,7 @@ PyObject *THPVariable_get_names(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-int THPVariable_set_names(THPVariable *self, PyObject *names) {
+int THPNestedTensor_set_names(THPNestedTensor *self, PyObject *names) {
   HANDLE_TH_ERRORS
   auto& var = self->cdata;
   if (names == Py_None) {
@@ -362,7 +362,7 @@ int THPVariable_set_names(THPVariable *self, PyObject *names) {
 }
 #endif
 
-int THPVariable_set_requires_grad(THPVariable *self, PyObject *obj, void *unused)
+int THPNestedTensor_set_requires_grad(THPNestedTensor *self, PyObject *obj, void *unused)
 {
   HANDLE_TH_ERRORS
   THPUtils_assertRet(-1, obj && PyBool_Check(obj), "requires_grad must be a bool");
@@ -381,14 +381,14 @@ int THPVariable_set_requires_grad(THPVariable *self, PyObject *obj, void *unused
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
-PyObject *THPVariable_get_name(THPVariable* self, void *unused)
+PyObject *THPNestedTensor_get_name(THPNestedTensor* self, void *unused)
 {
   if (self->cdata.name() == "")
     Py_RETURN_NONE;
   return THPUtils_packString(self->cdata.name().c_str());
 }
 
-PyObject *THPVariable_get_backwards_hooks(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_backwards_hooks(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   if (self->backward_hooks) {
@@ -399,7 +399,7 @@ PyObject *THPVariable_get_backwards_hooks(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-int THPVariable_set_backwards_hooks(THPVariable *self, PyObject *obj, void *unused)
+int THPNestedTensor_set_backwards_hooks(THPNestedTensor *self, PyObject *obj, void *unused)
 {
   HANDLE_TH_ERRORS
   THPUtils_assertRet(-1, obj, "Deletion of _backwards_hooks not allowed!");
@@ -417,24 +417,24 @@ int THPVariable_set_backwards_hooks(THPVariable *self, PyObject *obj, void *unus
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
-PyObject *THPVariable_get_base(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_base(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   if (self->cdata.is_view()) {
-    return THPVariable_Wrap(self->cdata.base());
+    return THPNestedTensor_Wrap(self->cdata.base());
   }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_get_shape(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_get_shape(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   return THPSize_New(self->cdata);
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_is_cuda(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_is_cuda(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& self_ = self->cdata;
@@ -442,7 +442,7 @@ PyObject *THPVariable_is_cuda(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_is_sparse(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_is_sparse(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& self_ = self->cdata;
@@ -450,7 +450,7 @@ PyObject *THPVariable_is_sparse(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_is_mkldnn(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_is_mkldnn(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& self_ = self->cdata;
@@ -458,7 +458,7 @@ PyObject *THPVariable_is_mkldnn(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-PyObject *THPVariable_is_quantized(THPVariable *self, void *unused)
+PyObject *THPNestedTensor_is_quantized(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& self_ = self->cdata;
@@ -466,7 +466,7 @@ PyObject *THPVariable_is_quantized(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-static PyObject *THPVariable_dtype(THPVariable *self, void *unused)
+static PyObject *THPNestedTensor_dtype(THPNestedTensor *self, void *unused)
 {
   HANDLE_TH_ERRORS
   auto& self_ = self->cdata;
@@ -474,67 +474,67 @@ static PyObject *THPVariable_dtype(THPVariable *self, void *unused)
   END_HANDLE_TH_ERRORS
 }
 
-static PyObject * THPVariable_layout(THPVariable* self, void *unused) {
+static PyObject * THPNestedTensor_layout(THPNestedTensor* self, void *unused) {
   HANDLE_TH_ERRORS
   auto& self_ = self->cdata;
   return torch::autograd::utils::wrap(torch::getLayout(self_.type().backend()));
   END_HANDLE_TH_ERRORS
 }
 
-static PyObject * THPVariable_device(THPVariable* self, void *unused) {
+static PyObject * THPNestedTensor_device(THPNestedTensor* self, void *unused) {
   HANDLE_TH_ERRORS
   return THPDevice_New(self->cdata.device());
   END_HANDLE_TH_ERRORS
 }
 
-static struct PyGetSetDef THPVariable_properties[] = {
-  {"T", (getter)THPVariable_get_T, nullptr, nullptr, nullptr},
-  {"_cdata", (getter)THPVariable_get_cdata, nullptr, nullptr, nullptr},
-  {"_version", (getter)THPVariable_get_version, nullptr, nullptr, nullptr},
-  {"grad_fn", (getter)THPVariable_get_grad_fn, nullptr, nullptr, nullptr},
-  {"_grad_fn", (getter)THPVariable_get_grad_fn, (setter)THPVariable_set_grad_fn, nullptr, nullptr},
-  {"is_leaf", (getter)THPVariable_is_leaf, nullptr, nullptr, nullptr},
-  {"data", (getter)THPVariable_get_data, (setter)THPVariable_set_data, nullptr, nullptr},
-  {"_grad", (getter)THPVariable_get_grad, (setter)THPVariable_set_grad, nullptr, nullptr}, // only for legacy reasons
-  {"grad", (getter)THPVariable_get_grad, (setter)THPVariable_set_grad, nullptr, nullptr},
-  {"_base", (getter)THPVariable_get_base, nullptr, nullptr, nullptr},
-  {"volatile", (getter)THPVariable_get_volatile, (setter)THPVariable_set_volatile, nullptr, nullptr},
-  {"output_nr", (getter)THPVariable_get_output_nr, nullptr, nullptr, nullptr},
-  {"requires_grad", (getter)THPVariable_get_requires_grad, (setter)THPVariable_set_requires_grad, nullptr, nullptr},
-  {"_backward_hooks", (getter)THPVariable_get_backwards_hooks, (setter)THPVariable_set_backwards_hooks, nullptr, nullptr},
-  {"name", (getter)THPVariable_get_name, nullptr, nullptr, nullptr},
-  {"shape", (getter)THPVariable_get_shape, nullptr, nullptr, nullptr},
-  {"is_cuda", (getter)THPVariable_is_cuda, nullptr, nullptr, nullptr},
-  {"is_sparse", (getter)THPVariable_is_sparse, nullptr, nullptr, nullptr},
-  {"is_mkldnn", (getter)THPVariable_is_mkldnn, nullptr, nullptr, nullptr},
-  {"is_quantized", (getter)THPVariable_is_quantized, nullptr, nullptr, nullptr},
-  {"dtype", (getter)THPVariable_dtype, nullptr, nullptr, nullptr},
-  {"layout", (getter)THPVariable_layout, nullptr, nullptr, nullptr},
-  {"device", (getter)THPVariable_device, nullptr, nullptr, nullptr},
-  {"ndim", (getter)THPVariable_get_ndim, nullptr, nullptr, nullptr},
+static struct PyGetSetDef THPNestedTensor_properties[] = {
+  {"T", (getter)THPNestedTensor_get_T, nullptr, nullptr, nullptr},
+  {"_cdata", (getter)THPNestedTensor_get_cdata, nullptr, nullptr, nullptr},
+  {"_version", (getter)THPNestedTensor_get_version, nullptr, nullptr, nullptr},
+  {"grad_fn", (getter)THPNestedTensor_get_grad_fn, nullptr, nullptr, nullptr},
+  {"_grad_fn", (getter)THPNestedTensor_get_grad_fn, (setter)THPNestedTensor_set_grad_fn, nullptr, nullptr},
+  {"is_leaf", (getter)THPNestedTensor_is_leaf, nullptr, nullptr, nullptr},
+  {"data", (getter)THPNestedTensor_get_data, (setter)THPNestedTensor_set_data, nullptr, nullptr},
+  {"_grad", (getter)THPNestedTensor_get_grad, (setter)THPNestedTensor_set_grad, nullptr, nullptr}, // only for legacy reasons
+  {"grad", (getter)THPNestedTensor_get_grad, (setter)THPNestedTensor_set_grad, nullptr, nullptr},
+  {"_base", (getter)THPNestedTensor_get_base, nullptr, nullptr, nullptr},
+  {"volatile", (getter)THPNestedTensor_get_volatile, (setter)THPNestedTensor_set_volatile, nullptr, nullptr},
+  {"output_nr", (getter)THPNestedTensor_get_output_nr, nullptr, nullptr, nullptr},
+  {"requires_grad", (getter)THPNestedTensor_get_requires_grad, (setter)THPNestedTensor_set_requires_grad, nullptr, nullptr},
+  {"_backward_hooks", (getter)THPNestedTensor_get_backwards_hooks, (setter)THPNestedTensor_set_backwards_hooks, nullptr, nullptr},
+  {"name", (getter)THPNestedTensor_get_name, nullptr, nullptr, nullptr},
+  {"shape", (getter)THPNestedTensor_get_shape, nullptr, nullptr, nullptr},
+  {"is_cuda", (getter)THPNestedTensor_is_cuda, nullptr, nullptr, nullptr},
+  {"is_sparse", (getter)THPNestedTensor_is_sparse, nullptr, nullptr, nullptr},
+  {"is_mkldnn", (getter)THPNestedTensor_is_mkldnn, nullptr, nullptr, nullptr},
+  {"is_quantized", (getter)THPNestedTensor_is_quantized, nullptr, nullptr, nullptr},
+  {"dtype", (getter)THPNestedTensor_dtype, nullptr, nullptr, nullptr},
+  {"layout", (getter)THPNestedTensor_layout, nullptr, nullptr, nullptr},
+  {"device", (getter)THPNestedTensor_device, nullptr, nullptr, nullptr},
+  {"ndim", (getter)THPNestedTensor_get_ndim, nullptr, nullptr, nullptr},
 #ifdef BUILD_NAMEDTENSOR
-  {"names", (getter)THPVariable_get_names, (setter)THPVariable_set_names, nullptr, nullptr},
+  {"names", (getter)THPNestedTensor_get_names, (setter)THPNestedTensor_set_names, nullptr, nullptr},
 #endif
   {nullptr}
 };
 
-static PyMappingMethods THPVariable_as_mapping = {
-  THPVariable_length,
-  THPVariable_getitem,
-  THPVariable_setitem,
+static PyMappingMethods THPNestedTensor_as_mapping = {
+  THPNestedTensor_length,
+  THPNestedTensor_getitem,
+  THPNestedTensor_setitem,
 };
 
 static PyMethodDef extra_methods[] = {
-  {"_make_subclass", (PyCFunction)(void(*)(void))THPVariable_make_subclass, METH_STATIC | METH_VARARGS | METH_KEYWORDS, nullptr},
+  {"_make_subclass", (PyCFunction)(void(*)(void))THPNestedTensor_make_subclass, METH_STATIC | METH_VARARGS | METH_KEYWORDS, nullptr},
   {nullptr}
 };
 
-PyTypeObject THPVariableType = {
+PyTypeObject THPNestedTensorType = {
   PyVarObject_HEAD_INIT(nullptr, 0)
   "torch._C._TensorBase",                /* tp_name */
-  sizeof(THPVariable),                   /* tp_basicsize */
+  sizeof(THPNestedTensor),                   /* tp_basicsize */
   0,                                     /* tp_itemsize */
-  (destructor)THPVariable_dealloc,       /* tp_dealloc */
+  (destructor)THPNestedTensor_dealloc,       /* tp_dealloc */
   nullptr,                                     /* tp_print */
   nullptr,                                     /* tp_getattr */
   nullptr,                                     /* tp_setattr */
@@ -542,7 +542,7 @@ PyTypeObject THPVariableType = {
   nullptr,                                     /* tp_repr */
   nullptr,                                     /* tp_as_number */
   nullptr,                                     /* tp_as_sequence */
-  &THPVariable_as_mapping,               /* tp_as_mapping */
+  &THPNestedTensor_as_mapping,               /* tp_as_mapping */
   nullptr,                                     /* tp_hash  */
   nullptr,                                     /* tp_call */
   nullptr,                                     /* tp_str */
@@ -551,15 +551,15 @@ PyTypeObject THPVariableType = {
   nullptr,                                     /* tp_as_buffer */
   Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, /* tp_flags */
   nullptr,                               /* tp_doc */
-  (traverseproc)THPVariable_traverse,    /* tp_traverse */
-  (inquiry)THPVariable_clear,            /* tp_clear */
+  (traverseproc)THPNestedTensor_traverse,    /* tp_traverse */
+  (inquiry)THPNestedTensor_clear,            /* tp_clear */
   nullptr,                                     /* tp_richcompare */
   0,                                     /* tp_weaklistoffset */
   nullptr,                                     /* tp_iter */
   nullptr,                                     /* tp_iternext */
   nullptr,                                     /* tp_methods */
   nullptr,                                     /* tp_members */
-  THPVariable_properties,                /* tp_getset */
+  THPNestedTensor_properties,                /* tp_getset */
   nullptr,                                     /* tp_base */
   nullptr,                                     /* tp_dict */
   nullptr,                                     /* tp_descr_get */
@@ -567,12 +567,12 @@ PyTypeObject THPVariableType = {
   0,                                     /* tp_dictoffset */
   nullptr,                                     /* tp_init */
   nullptr,                                     /* tp_alloc */
-  THPVariable_pynew                      /* tp_new */
+  THPNestedTensor_pynew                      /* tp_new */
 };
 
 namespace torch { namespace autograd {
 
-extern PyMethodDef variable_methods[];
+extern PyMethodDef NestedTensor_methods[];
 extern void initTorchFunctions(PyObject *module);
 
 void initTensorImplConversion(PyObject* module) {
@@ -583,15 +583,15 @@ void initTensorImplConversion(PyObject* module) {
     TORCH_CHECK(p.defined(), "Can't wrap undefined tensor");
     auto tensor = at::Tensor::wrap_tensor_impl(std::move(p));
     // For now, there is no guarantee that the tensors returned from Caffe2 ops
-    // are not Variables, because inputs to Caffe2 ops can be Variables.
+    // are not NestedTensors, because inputs to Caffe2 ops can be NestedTensors.
     //
-    // In the near future, once we make every tensor a Variable, we can remove
-    // the `tensor.is_variable()` check and directly return `tensor` as a Variable.
-    return py::cast(tensor.is_variable() ? torch::autograd::Variable(tensor) :
-      torch::autograd::make_variable(std::move(tensor), false));
+    // In the near future, once we make every tensor a NestedTensor, we can remove
+    // the `tensor.is_NestedTensor()` check and directly return `tensor` as a NestedTensor.
+    return py::cast(tensor.is_NestedTensor() ? torch::autograd::NestedTensor(tensor) :
+      torch::autograd::make_NestedTensor(std::move(tensor), false));
   });
   // set on the module level to avoid mixing pybind and plain CPython extensions
-  m.def("_tensor_impl_raw_handle", [](torch::autograd::Variable* t) -> void* {
+  m.def("_tensor_impl_raw_handle", [](torch::autograd::NestedTensor* t) -> void* {
     // We return a raw non-owning pointer here, we rely on surrounding
     // code to keep the original tensor alive
     return t->getIntrusivePtr().get();
@@ -599,16 +599,16 @@ void initTensorImplConversion(PyObject* module) {
 }
 }}
 
-bool THPVariable_initModule(PyObject *module)
+bool THPNestedTensor_initModule(PyObject *module)
 {
   static std::vector<PyMethodDef> methods;
-  THPUtils_addPyMethodDefs(methods, torch::autograd::variable_methods);
+  THPUtils_addPyMethodDefs(methods, torch::autograd::NestedTensor_methods);
   THPUtils_addPyMethodDefs(methods, extra_methods);
-  THPVariableType.tp_methods = methods.data();
-  if (PyType_Ready(&THPVariableType) < 0)
+  THPNestedTensorType.tp_methods = methods.data();
+  if (PyType_Ready(&THPNestedTensorType) < 0)
     return false;
-  Py_INCREF(&THPVariableType);
-  PyModule_AddObject(module, "_TensorBase",   (PyObject *)&THPVariableType);
+  Py_INCREF(&THPNestedTensorType);
+  PyModule_AddObject(module, "_TensorBase",   (PyObject *)&THPNestedTensorType);
   torch::autograd::initTorchFunctions(module);
   torch::autograd::initTensorImplConversion(module);
   return true;
