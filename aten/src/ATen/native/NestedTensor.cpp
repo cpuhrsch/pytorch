@@ -2,7 +2,7 @@
 
 namespace at { namespace native {
 
-Tensor _make_nested(Tensor self) {
+Tensor _make_nested(const Tensor& self) {
   return makeNested(self);
 }
 

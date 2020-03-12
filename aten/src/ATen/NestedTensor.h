@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <nestedtensor/nestedtensor.h>
+#include <nested_tensor.h>
 
 namespace at {
 
@@ -21,11 +21,20 @@ struct NestedTensorImpl : public c10::TensorImpl {
 
   at::Tensor rep_;
 
+  IntArrayRef sizes() const {
+    return IntArrayRef(std::vector<int64_t>({1, 2, 3}));
+  }
+
 };
 
-inline Tensor makeNested(Tensor tensors) {
-  TORCH_CHECK(tensors.size() > 0, "Require at least one Tensor");
+inline Tensor makeNested(const Tensor& tensors) {
+  // TORCH_CHECK(tensors.size() > 0, "Require at least one Tensor");
   return at::detail::make_tensor<NestedTensorImpl>(tensors);
+}
+
+inline std::ostream& operator<<(std::ostream& out, const NestedTensorImpl& batch_tensor) {
+  out << "NestedTensor[lvl" << batch_tensor.rep_ << "/bdim";
+  return out;
 }
 
 }
