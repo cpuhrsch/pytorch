@@ -12,7 +12,7 @@ bool isNestedTensor(const Tensor& tensor) {
 
 static auto registry = torch::RegisterOperators()
   .op(torch::RegisterOperators::options()
-      .schema("aten::_make_nested(Tensor self) -> Tensor")
+      .schema("aten::_make_nested(TensorList self) -> Tensor")
       .kernel(NestedTensorKey, &at::native::_make_nested))
   ;
 
