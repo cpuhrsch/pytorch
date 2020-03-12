@@ -14,5 +14,6 @@ static auto registry = torch::RegisterOperators()
   .op(torch::RegisterOperators::options()
       .schema("aten::_make_nested(Tensor self) -> Tensor")
       .kernel(NestedTensorKey, &at::native::_make_nested))
+  ;
 
 }

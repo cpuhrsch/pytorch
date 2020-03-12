@@ -36,6 +36,8 @@ endif()
 # NB: If you edit these globs, you'll have to update setup.py package_data as well
 FILE(GLOB base_h "*.h" "detail/*.h" "cpu/*.h" "cpu/vec256/*.h" "quantized/*.h")
 FILE(GLOB base_cpp "*.cpp" "detail/*.cpp" "cpu/*.cpp")
+FILE(GLOB nestedtensor_h "nestedtensor/*.h")
+FILE(GLOB nestedtensor_cpp "nestedtensor/*.cpp")
 add_subdirectory(core)
 FILE(GLOB cuda_h "cuda/*.h" "cuda/detail/*.h" "cuda/*.cuh" "cuda/detail/*.cuh")
 FILE(GLOB cuda_cpp "cuda/*.cpp" "cuda/detail/*.cpp")
@@ -88,7 +90,7 @@ FILE(GLOB native_quantized_hip_cpp "native/quantized/hip/*.cpp")
 FILE(GLOB native_xnnpack "native/xnnpack/*.cpp")
 
 add_subdirectory(quantized)
-set(all_cpu_cpp ${base_cpp} ${ATen_CORE_SRCS} ${native_cpp} ${native_sparse_cpp} ${native_quantized_cpp} ${native_mkl_cpp} ${native_mkldnn_cpp} ${native_xnnpack} ${generated_cpp} ${core_generated_cpp} ${ATen_CPU_SRCS} ${ATen_QUANTIZED_SRCS} ${cpu_kernel_cpp})
+set(all_cpu_cpp ${base_cpp} ${nestedtensor_cpp} ${ATen_CORE_SRCS} ${native_cpp} ${native_sparse_cpp} ${native_quantized_cpp} ${native_mkl_cpp} ${native_mkldnn_cpp} ${native_xnnpack} ${generated_cpp} ${core_generated_cpp} ${ATen_CPU_SRCS} ${ATen_QUANTIZED_SRCS} ${cpu_kernel_cpp})
 if(AT_MKL_ENABLED)
   set(all_cpu_cpp ${all_cpu_cpp} ${mkl_cpp})
 endif()
@@ -381,9 +383,9 @@ INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake-exports/ATenConfig.cmake"
   DESTINATION "${AT_INSTALL_SHARE_DIR}/cmake/ATen")
 
 if(INTERN_BUILD_MOBILE)
-  set(INSTALL_HEADERS ${base_h} ${ATen_CORE_HEADERS})
+  set(INSTALL_HEADERS ${base_h} ${nestedtensor_h} ${ATen_CORE_HEADERS})
 else()
-  set(INSTALL_HEADERS ${base_h} ${ATen_CORE_HEADERS} ${native_h} ${native_cpu_h} ${native_quantized_h} ${cuda_h} ${cudnn_h} ${hip_h} ${miopen_h})
+  set(INSTALL_HEADERS ${base_h} ${nestedtensor_h} ${ATen_CORE_HEADERS} ${native_h} ${native_cpu_h} ${native_quantized_h} ${cuda_h} ${cudnn_h} ${hip_h} ${miopen_h})
 endif()
 
 # https://stackoverflow.com/questions/11096471/how-can-i-install-a-hierarchy-of-files-using-cmake
