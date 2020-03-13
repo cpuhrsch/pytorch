@@ -5,15 +5,15 @@
 
 namespace at {
 
-bool isNestedTensor(const Tensor& tensor) {
-  return tensor.defined() &&
-      tensor.unsafeGetTensorImpl()->key_set().has(NestedTensorKey);
-}
+// bool isNestedTensor(const Tensor& tensor) {
+//   return tensor.defined() &&
+//       tensor.unsafeGetTensorImpl()->key_set().has(NestedTensorKey);
+// }
 
-static auto registry = torch::RegisterOperators()
-  .op(torch::RegisterOperators::options()
-      .schema("aten::_make_nested(Tensor[] self) -> Tensor")
-      .kernel(NestedTensorKey, &at::native::_make_nested))
-  ;
+// static auto registry = torch::RegisterOperators()
+//   .op(torch::RegisterOperators::options()
+//       .schema("aten::_make_nested(Tensor[] self) -> Tensor")
+//       .kernel(NestedTensorKey, &at::native::_make_nested))
+//   ;
 
 }

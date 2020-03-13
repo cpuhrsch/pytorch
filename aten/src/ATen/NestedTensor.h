@@ -9,7 +9,7 @@ constexpr auto NestedTensorKey = DispatchKey::NestedTensorId;
 
 struct NestedTensorImpl : public c10::TensorImpl {
   explicit NestedTensorImpl(
-      at::Tensor rep)
+      torch::nested_tensor::NestedTensor rep)
     : TensorImpl(
         c10::DispatchKeySet(NestedTensorKey),
         rep.dtype(),
@@ -20,7 +20,7 @@ struct NestedTensorImpl : public c10::TensorImpl {
   std::cout << "DOING THIS" << std::endl;
     }
 
-  at::Tensor rep_;
+  torch::nested_tensor::NestedTensor rep_;
 
   IntArrayRef sizes() const {
   std::cout << "DOING THAT" << std::endl;
@@ -28,16 +28,5 @@ struct NestedTensorImpl : public c10::TensorImpl {
   }
 
 };
-
-inline Tensor makeNested(TensorList tensors) {
-  std::cout << "IM HERE" << std::endl;
-  TORCH_CHECK(tensors.size() > 0, "Require at least one Tensor");
-  return at::detail::make_tensor<NestedTensorImpl>(at::ones({}));
-}
-
-inline std::ostream& operator<<(std::ostream& out, const NestedTensorImpl& batch_tensor) {
-  out << "NestedTensor[lvl" << batch_tensor.rep_ << "/bdim";
-  return out;
-}
 
 }
