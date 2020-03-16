@@ -76,6 +76,16 @@ class TestBatching(TestCase):
         output = vmap(F.conv2d, (1, None))(imgs, weight)
         self.assertEqual(output, expected)
 
+    def test_nested_tensor_conv2d(self):
+        imgs = torch._make_nested([torch.randn(3, 5, 5) for _ in range(7)])
+        weight = torch.randn(3, 3, 2, 2)
+        # expected = F.conv2d(imgs, weight)
+        print("AAA")
+        output = vmap(F.conv2d, (0, None))(imgs, weight)
+        print("BBB")
+        # self.assertEqual(output, expected)
+
+
     def test_conv2d_two_batch_dims(self):
         y25739 = torch.randn(2, 5, 7, 3, 9)
         weight = torch.randn(13, 7, 2, 2, requires_grad=True)
