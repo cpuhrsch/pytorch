@@ -74,12 +74,19 @@ class TestPrototype(TestCase):
         self.assertEqual(x23.grad, torch.ones_like(x23))
 
     def test_vmap_sum(self):
-        pass
+        x235 = torch.randn(2, 3, 5)
+        self.assertEqual(vmap(torch.sum, (0, None))(x235, 0), x235.sum(1))
+        self.assertEqual(vmap(torch.sum, (0, None))(x235, [0, 1]), x235.sum([1, 2]))
+        self.assertEqual(vmap(torch.sum, (1, None))(x235, 0), x235.sum(0))
+        self.assertEqual(vmap(torch.sum, (1, None))(x235, 1), x235.sum(2))
+        # NB: full-reduce sum is pretty broken. It's a long story.
 
     def test_vmap_sum_autograd(self):
-        pass
-
-
+        x235 = torch.randn(2, 3, 5, requires_grad=True)
+        output = vmap(torch.sum, (0, None))(x235, 0)
+        grad_output = torch.rand_like(output)
+        output.backward(grad_output)
+        self.assertEqual(x235.grad, grad_output.view(2, 1, 5).expand(2, 3, 5))
 
 if __name__ == '__main__':
     run_tests()

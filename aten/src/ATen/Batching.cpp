@@ -83,6 +83,17 @@ int64_t actualDim(int64_t dim, optional<int64_t> maybe_batch_dim) {
   return dim;
 }
 
+std::vector<int64_t> actualDim(IntArrayRef dims, optional<int64_t> maybe_batch_dim) {
+  if (!maybe_batch_dim.has_value()) {
+    return dims.vec();
+  }
+  auto result = dims.vec();
+  for (int64_t i = 0; i < result.size(); ++i) {
+    result[i] = actualDim(result[i], maybe_batch_dim);
+  }
+  return result;
+}
+
 int64_t minRequiredDim(const Tensor& tensor, optional<int64_t> batch_dim) {
   auto result = tensor.dim(); 
   if (!batch_dim) {
@@ -214,6 +225,23 @@ std::pair<Tensor,optional<int64_t>> batch_norm_batching_rule(
   };
 }
 
+std::pair<Tensor,optional<int64_t>> sum_batching_rule(
+    const Tensor& self, optional<int64_t> self_bdim,
+    IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype) {
+  if (!self_bdim.has_value() || keepdim) {
+    return {
+      at::sum(self, dim, keepdim, dtype),
+      /*result_bdim=*/nullopt
+    };
+  }
+  auto reduced = std::count_if(
+      dim.begin(), dim.end(), [&](int64_t dim) { return dim < self_bdim; });
+  return {
+    at::sum(self, dim, keepdim, dtype),
+    *self_bdim - reduced
+  };
+}
+
 /////////////////////////////////////////////////////////////
 // --------------------[ FALLBACK IMPLEMENTATION ]-----------
 /////////////////////////////////////////////////////////////
@@ -271,6 +299,19 @@ Tensor BatchedTensor_batch_norm(
       running_mean_and_bdim.first, running_mean_and_bdim.second,
       running_var_and_bdim.first, running_var_and_bdim.second,
       training, momentum, eps, cudnn_enabled);
+  return makeBatched(
+      result_and_bdim.first,
+      result_and_bdim.second,
+      cur_level);
+}
+
+Tensor BatchedTensor_sum(const Tensor& self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype) {
+  auto cur_level = maxLevel({self});
+  auto self_and_bdim = unwrapAtLevel(self, cur_level);
+  auto actual_dims = actualDim(dim, self_and_bdim.second);
+  auto result_and_bdim = sum_batching_rule(
+      self_and_bdim.first, self_and_bdim.second,
+      actual_dims, keepdim, dtype);
   return makeBatched(
       result_and_bdim.first,
       result_and_bdim.second,
@@ -348,6 +389,10 @@ static auto registry2 = torch::RegisterOperators()
             result_with_batch.second,
             cur_level);
       }))
+  // TODO: register as unboxed operator
+  .op(torch::RegisterOperators::options()
+      .schema("aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor")
+      .impl_unboxedOnlyKernel<Tensor (const Tensor&, IntArrayRef, bool, optional<ScalarType>), BatchedTensor_sum>(BatchTensorKey))
   .op(torch::RegisterOperators::options()
       .schema("aten::detach(Tensor self) -> (Tensor)")
       .kernel(BatchTensorKey, [] (const Tensor& self) -> Tensor {
