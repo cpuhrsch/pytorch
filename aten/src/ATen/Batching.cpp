@@ -212,15 +212,17 @@ std::pair<Tensor,optional<int64_t>> batch_norm_batching_rule(
       /*result_bdim=*/nullopt
     };
   }
-  auto result_dim = minRequiredDim(input, input_bdim);
-  auto self_ = moveBatchDimToFront(input, input_bdim, result_dim);
-  auto self_sizes = self_.sizes();
-  self_ = self_.flatten(0, 1);
-  auto result = at::batch_norm(
-      self_, weight, bias, running_mean, running_var,
-      training, momentum, eps, cudnn_enabled);
+  // TODO: register a batched_batch_norm op?
+  // Naive: unbind, op, stack. This probably doesn't work with nesting
+  auto tensors = input.unbind(*input_bdim);
+  std::vector<Tensor> results; 
+  for (const auto& tensor : tensors) {
+    results.push_back(at::batch_norm(
+      tensor, weight, bias, running_mean, running_var,
+      training, momentum, eps, cudnn_enabled));
+  }
   return {
-    result.unflatten(0, {self_sizes.begin(), self_sizes.begin() + 2}),
+    at::stack(results),
     /*result_bdim=*/0
   };
 }

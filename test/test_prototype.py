@@ -1,6 +1,7 @@
 from torch.testing._internal.common_utils import TestCase, run_tests
 import torch
 from torch import vmap, Tensor
+from torch.autograd import gradcheck
 import torch.nn.functional as F
 
 
@@ -46,10 +47,15 @@ class TestPrototype(TestCase):
         self.assertEqual(output, expected)
 
     def test_vmap_conv2d_autograd(self):
-        pass
+        imgs = torch.randn(2, 5, 3, 3, 3, dtype=torch.double)
+        weight = torch.randn(2, 3, 2, 2, requires_grad=True, dtype=torch.double)
+        bias = torch.randn(2, requires_grad=True, dtype=torch.double)
+        func = vmap(F.conv2d, (0, None, None))
+        gradcheck(func, [imgs, weight, bias])
 
     def test_vmap_batch_norm(self):
         N, C, H, W = (7, 3, 5, 5)
+        B = 2
         imgs = torch.randn(N, C, H, W)
         running_mean = torch.randn(C)
         running_var = torch.randn(C)
@@ -57,8 +63,19 @@ class TestPrototype(TestCase):
         output = vmap(F.batch_norm, (None, None, None))(imgs, running_mean, running_var)
         self.assertEqual(output, F.batch_norm(imgs, running_mean, running_var))
 
+        # batchbatchnorm
+        imgs = torch.randn(B, N, C, H, W)
+        output = vmap(F.batch_norm, (0, None, None))(imgs, running_mean, running_var)
+        self.assertEqual(output[0], F.batch_norm(imgs[0], running_mean, running_var))
+        self.assertEqual(output[1], F.batch_norm(imgs[1], running_mean, running_var))
+
     def test_vmap_batch_norm_autograd(self):
-        pass
+        B, N, C, H, W = (5, 3, 2, 1, 1)
+        imgs = torch.randn(B, N, C, H, W, requires_grad=True, dtype=torch.double)
+        running_mean = torch.zeros(C, dtype=torch.double)
+        running_var = torch.ones(C, dtype=torch.double)
+        batched_batch_norm = vmap(F.batch_norm, (0, None, None))
+        gradcheck(batched_batch_norm, [imgs, running_mean, running_var])
 
     def test_vmap_add(self):
         x23 = torch.randn(2, 3)
