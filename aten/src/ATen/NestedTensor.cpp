@@ -27,8 +27,9 @@ Tensor NestedTensor_conv2d(const Tensor& input, const Tensor& weight,
   //     bias_and_bdim.second,
   //     stride, padding, dilation, groups);
   std::cout << "REEEEEEEEEEEEEE" << std::endl;
-  return at::detail::make_tensor<NestedTensorImpl>(
-      NestedTensor(TensorNode(at::ones({}))));
+  // return at::detail::make_tensor<NestedTensorImpl>(
+  //     NestedTensor(TensorNode(at::ones({}))));
+  return at::ones({1, 2, 3, 1});
 }
 
 static auto registry = torch::RegisterOperators()
