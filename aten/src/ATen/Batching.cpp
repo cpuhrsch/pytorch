@@ -176,8 +176,7 @@ std::pair<Tensor,optional<int64_t>> conv2d_batching_rule(
   }
   auto result_dim = minRequiredDim(self, self_bdim);
   std::cout << "c1" << std::endl;
-  // auto self_ = moveBatchDimToFront(self, self_bdim, result_dim);
-  auto self_ = self;
+  auto self_ = moveBatchDimToFront(self, self_bdim, result_dim);
   std::cout << "c2" << std::endl;
   std::cout << "c2 self_.dim(): " << self_.dim() << std::endl;
   if (self_.dim() == 4) {

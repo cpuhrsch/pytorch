@@ -20,6 +20,11 @@ struct NestedTensorImpl : public c10::TensorImpl {
   std::cout << "DOING THIS" << std::endl;
     }
 
+  int64_t dim() const {
+    std::cout << "GETTING DIM" << std::endl;
+    return rep_.dim();
+  }
+
 
   IntArrayRef sizes() const {
   std::cout << "DOING THAT" << std::endl;

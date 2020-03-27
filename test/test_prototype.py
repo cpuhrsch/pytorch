@@ -34,6 +34,7 @@ class TestPrototype(TestCase):
         # expected = F.conv2d(imgs, weight)
         print("AAA")
         output = vmap(F.conv2d, (0, None))(imgs, weight)
+        print("OUTPUT: " + str(output))
         print("BBB")
         # self.assertEqual(output, expected)
 
