@@ -32,10 +32,8 @@ class TestPrototype(TestCase):
         imgs = torch._make_nested([torch.randn(3, 5, 5) for _ in range(7)])
         weight = torch.randn(3, 3, 2, 2)
         # expected = F.conv2d(imgs, weight)
-        print("AAA")
         output = vmap(F.conv2d, (0, None))(imgs, weight)
-        print("OUTPUT: " + str(output))
-        print("BBB")
+        print(output)
         # self.assertEqual(output, expected)
 
     def test_vmap_conv2d_two_batch_dims(self):
