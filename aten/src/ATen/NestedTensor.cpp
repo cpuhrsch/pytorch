@@ -12,23 +12,6 @@ Tensor NestedTensor_conv2d(const Tensor& input, const Tensor& weight,
                             const Tensor& bias, IntArrayRef stride,
                             IntArrayRef padding, IntArrayRef dilation,
                             int64_t groups) {
-  // The following lines need to happen in each kernel
-  // auto cur_level = maxLevel({input, weight, bias});
-  // auto input_and_bdim = unwrapAtLevel(input, cur_level);
-  // auto weight_and_bdim = unwrapAtLevel(weight, cur_level);
-  // auto bias_and_bdim = unwrapAtLevel(bias, cur_level);
-
-  // auto result_and_bdim = conv2d_batching_rule(
-  //     input_and_bdim.first,
-  //     input_and_bdim.second,
-  //     weight_and_bdim.first,
-  //     weight_and_bdim.second,
-  //     bias_and_bdim.first,
-  //     bias_and_bdim.second,
-  //     stride, padding, dilation, groups);
-  std::cout << "REEEEEEEEEEEEEE" << std::endl;
-  // return at::detail::make_tensor<NestedTensorImpl>(
-  //     NestedTensor(TensorNode(at::ones({}))));
   return at::ones({1, 2, 3, 1});
 }
 

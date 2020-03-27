@@ -43,17 +43,11 @@ std::pair<Tensor,optional<int64_t>> unwrapAtLevel(const Tensor& tensor, int64_t 
 }
 
 Tensor broadcastTo(const Tensor& tensor, int64_t ndim) {
-  std::cout << "1AA" << std::endl;
   auto old_sizes = tensor.sizes();
-  std::cout << "2AA" << std::endl;
   if (old_sizes.size() == ndim) {
     return tensor;
   }
-  std::cout << "3AA" << std::endl;
-  std::cout << "old_sizes.size(): " << old_sizes.size() << std::endl;
-  std::cout << "ndim: " << ndim << std::endl;
   TORCH_INTERNAL_ASSERT(old_sizes.size() <= ndim);
-  std::cout << "4AA" << std::endl;
   // TODO: This is really slow, we should probably write a new operator for
   // this. Note that we can't call view because it is not "semantic" enough.
   // It might be possible to just call reshape here.
@@ -74,16 +68,11 @@ Tensor moveBatchDimToFront(
   }
   auto bdim = *batch_dim;
   auto extra_dims = result_dim - tensor.dim();
-  std::cout << "G1 result_dim: " << result_dim << std::endl;
   auto result = broadcastTo(tensor, result_dim);
-  std::cout << "G2" << std::endl;
   auto transpose_dim = bdim + extra_dims;
-  std::cout << "G3" << std::endl;
   if (transpose_dim == 0) {
-  std::cout << "G4" << std::endl;
     return result;
   }
-  std::cout << "G5" << std::endl;
   return result.transpose(0, bdim + extra_dims);
 }
 
@@ -175,12 +164,8 @@ std::pair<Tensor,optional<int64_t>> conv2d_batching_rule(
     TORCH_CHECK(false, "NYI: conv2d_batching_rule for batched bias");
   }
   auto result_dim = minRequiredDim(self, self_bdim);
-  std::cout << "c1" << std::endl;
   auto self_ = moveBatchDimToFront(self, self_bdim, result_dim);
-  std::cout << "c2" << std::endl;
-  std::cout << "c2 self_.dim(): " << self_.dim() << std::endl;
   if (self_.dim() == 4) {
-    std::cout << "c3" << std::endl;
     // User used vmap over a batch of 3D tensors.
     return { at::conv2d(self_, weight, bias, stride, padding, dilation), 0 };
   }
