@@ -5,7 +5,6 @@ namespace at { namespace native {
 using namespace torch::nested_tensor;
 
 Tensor _make_nested(TensorList self) {
-  std::cout << "IM HERE" << std::endl;
   std::vector<at::Tensor> tensors = self.vec();
   std::vector<TensorNode> tensor_nodes;
   for (size_t i = 0; i < tensors.size(); i++) {
