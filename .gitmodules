@@ -122,6 +122,6 @@
     ignore = dirty
     path = third_party/XNNPACK
     url = https://github.com/google/XNNPACK.git
-[submodule "third_party/nestedtensor"]
-	path = third_party/nestedtensor
+[submodule "aten/src/ATen/nestedtensor"]
+	path = aten/src/ATen/nestedtensor
 	url = https://github.com/pytorch/nestedtensor

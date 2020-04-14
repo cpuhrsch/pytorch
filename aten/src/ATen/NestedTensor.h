@@ -20,7 +20,7 @@ struct NestedTensorImpl : public c10::TensorImpl {
   }
 
   IntArrayRef sizes() const {
-    std::vector<c10::optional<int64_t>> size = rep_.sizes();
+    std::vector<c10::optional<int64_t>> size = rep_.size();
     std::vector<int64_t> sizes;
     for (auto opt_int : size) {
       if (opt_int) {
