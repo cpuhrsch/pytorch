@@ -98,8 +98,7 @@ endif()
 
 list(APPEND ATen_CPU_INCLUDE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/ATen/nestedtensor/nestedtensor/csrc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/ATen/nestedtensor/nestedtensor/csrc/utils
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/ATen/nestedtensor
   ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/catch/single_include)
 add_subdirectory(src/ATen)
 
