@@ -518,7 +518,7 @@ at::Tensor conv2d(
     return result.squeeze(0);
   } else {
     return result;
-  } 
+  }
 }
 
 at::Tensor conv3d(

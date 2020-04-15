@@ -1,6 +1,7 @@
 import torch
 import functools
 from torch import Tensor
+from typing import Optional
 
 VMAP_LEVEL = 0
 
@@ -13,11 +14,13 @@ def _make_batched(args, dims, level):
         batch_size = batch_sizes[0]
         assert all([size == batch_size for size in batch_sizes])
     return [torch._make_batched(arg, dim, level)
-            if isinstance(arg, Tensor) else arg
+            if isinstance(arg, Tensor) and dim is not None else arg
             for arg, dim in zip(args, dims)], batch_size
 
 
 def _unwrap_batched_single(output, batch_size):
+    if batch_size is None:
+        return output
     if isinstance(output, torch.Tensor):
         if torch._is_batched(output):
             return torch._unwrap_batched(output, 0)

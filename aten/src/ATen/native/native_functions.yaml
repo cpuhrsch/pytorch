@@ -45,9 +45,6 @@
 - func: _unwrap_batched(Tensor self, int level) -> Tensor
   use_c10_dispatcher: full
 
-- func: _batch_dim(Tensor self) -> int
-  use_c10_dispatcher: full
-
 - func: _is_batched(Tensor self) -> bool
   use_c10_dispatcher: full
 
