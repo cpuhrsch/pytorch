@@ -39,14 +39,8 @@ struct NestedTensorImpl : public c10::TensorImpl {
 inline std::ostream& operator<<(std::ostream& out, const NestedTensorImpl& batch_tensor) {
   auto node = batch_tensor.rep_.get_structure();
   out << "NESTED_TENSOR";
+  apply([&out](at::Tensor tensor) { out << tensor << std::endl; }, node);
   out << std::endl;
-  // out << NestedNode___str__(
-  //     node, "nested_tensor", [](c10::IValue payload, const std::string& tabs) {
-  //       std::stringstream ss;
-  //       ss << payload.toTensor();
-  //       ss << std::endl;
-  //       return ss.str();
-  //     });
   return out;
 }
 

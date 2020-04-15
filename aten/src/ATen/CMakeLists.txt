@@ -36,8 +36,12 @@ endif()
 # NB: If you edit these globs, you'll have to update setup.py package_data as well
 FILE(GLOB base_h "*.h" "detail/*.h" "cpu/*.h" "cpu/vec256/*.h" "quantized/*.h")
 FILE(GLOB base_cpp "*.cpp" "detail/*.cpp" "cpu/*.cpp")
-FILE(GLOB nestedtensor_h "nestedtensor/nestedtensor/csrc/*.h" "nestedtensor/nestedtensor/csrc/utils/*.h")
-FILE(GLOB nestedtensor_cpp "nestedtensor/nestedtensor/csrc/*.cpp" "nestedtensor/nestedtensor/csrc/utils/*.cpp")
+FILE(GLOB nestedtensor_h
+  "nestedtensor/nestedtensor/csrc/nested_tensor.h",
+  "nestedtensor/nestedtensor/csrc/functions.h")
+FILE(GLOB nestedtensor_cpp
+  "nestedtensor/nestedtensor/csrc/nested_tensor.cpp",
+  "nestedtensor/nestedtensor/csrc/functions.cpp")
 add_subdirectory(core)
 FILE(GLOB cuda_h "cuda/*.h" "cuda/detail/*.h" "cuda/*.cuh" "cuda/detail/*.cuh")
 FILE(GLOB cuda_cpp "cuda/*.cpp" "cuda/detail/*.cpp")

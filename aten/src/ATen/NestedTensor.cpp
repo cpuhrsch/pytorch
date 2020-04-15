@@ -2,6 +2,7 @@
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/op_registration/op_registration.h>
 #include <torch/csrc/jit/runtime/operator.h>
+#include <nestedtensor/csrc/functions.h>
 
 namespace at {
 
@@ -15,11 +16,10 @@ Tensor NestedTensor_conv2d(const Tensor& input, const Tensor& weight,
   // auto nt = NestedTensor(at::ones({2, 3, 2, 1}));
   auto input_impl = static_cast<NestedTensorImpl*>(input.unsafeGetTensorImpl());
   // std::cout << "HERE : "  << *input_impl << std::endl;
-  auto nt = input_impl->rep_;
+  auto nt = torch::nested_tensor::conv2d(
+      input_impl->rep_, weight, bias, stride, padding, dilation, groups);
   // std::cout << "MADE" << std::endl;
-  auto result = at::detail::make_tensor<NestedTensorImpl>(std::move(nt));
-  // std::cout << "result: " << result << std::endl;
-  return result;
+  return at::detail::make_tensor<NestedTensorImpl>(std::move(nt));
 }
 
 static auto registry = torch::RegisterOperators()
