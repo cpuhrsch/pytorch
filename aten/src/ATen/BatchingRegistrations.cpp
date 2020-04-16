@@ -51,11 +51,13 @@ Tensor BatchedTensor_conv2d(const Tensor& input, const Tensor& weight,
 
   Tensor result_;
   BatchDims result_bdims;
+  std::cout << "BBB1" << std::endl;
   std::tie(result_, result_bdims) = conv2d_batching_rule(
       input_, input_bdims,
       weight_, weight_bdims,
       bias_, bias_bdims,
       stride, padding, dilation, groups);
+  std::cout << "BBB2" << std::endl;
   return detail::make_tensor<BatchTensorImpl>(result_, result_bdims);
 }
 

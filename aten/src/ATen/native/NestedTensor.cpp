@@ -14,4 +14,8 @@ Tensor _make_nested(TensorList self) {
       NestedTensor(TensorNode(std::move(tensor_nodes))));
 }
 
+bool _is_nested(const Tensor& self) {
+  return isNested(self);
+}
+
 }}

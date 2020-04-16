@@ -155,6 +155,7 @@ class Tensor(torch._C._TensorBase):
         self.requires_grad, _, self._backward_hooks = state
 
     def __repr__(self):
+        # TODO: Get rid of sys.version_info branch
         # All strings are unicode in Python 3, while we have to encode unicode
         # strings in Python2. If we can't, let python decide the best
         # characters to replace unicode characters with.

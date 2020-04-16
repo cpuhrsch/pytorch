@@ -33,12 +33,13 @@ class TestPrototype(TestCase):
         output = vmap(F.conv2d, (1, None))(imgs, weight)
         self.assertEqual(output, expected)
 
-    @unittest.expectedFailure
     def test_nested_tensor_conv2d(self):
         imgs = torch._make_nested([torch.randn(3, 5, 5) for _ in range(7)])
         weight = torch.randn(3, 3, 2, 2)
         expected = F.conv2d(imgs, weight)
+        print("AA")
         output = vmap(F.conv2d, (0, None))(imgs, weight)
+        print("BB")
         print(output)
         self.assertEqual(output, expected)
 

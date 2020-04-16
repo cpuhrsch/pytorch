@@ -68,14 +68,20 @@ std::pair<Tensor,BatchDims> conv2d_batching_rule(
     TORCH_CHECK(false, "NYI: conv2d_batching_rule for batched bias");
   }
 
+  std::cout << "R01" << std::endl;
   auto input_ = moveBdimsToFront(input, input_bdims);
+  std::cout << "R02" << std::endl;
   auto result_bdims = moveBdimsToFront(input_bdims);
+  std::cout << "R1" << std::endl;
 
   if (input_.dim() <= 4) {
+  std::cout << "R2" << std::endl;
     // No need to flatten
     auto result = at::conv2d(input_, weight, bias, stride, padding, dilation, groups);
+  std::cout << "R3" << std::endl;
     return { result, result_bdims };
   }
+  std::cout << "R4" << std::endl;
 
   auto num_dims_to_flatten = input_bdims.size() + 1;
   auto flat_input_ = input_.flatten(0, num_dims_to_flatten - 1);

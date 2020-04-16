@@ -249,6 +249,18 @@ def get_summarized_data(self):
 
 
 def _str(self):
+    if torch._is_nested(self):
+        # print('torch._is_nested(self)')
+        # print("DDDDDDDD")
+        # print('len(self)')
+        # print(len(self))
+        # print(self.size())
+        # print('self[0]')
+        s = ""
+        for i in range(len(self)):
+            # TODO: Use nested_dim to determine indentation
+            s += "\t" + _str(self[i])
+        return s
     prefix = 'tensor('
     indent = len(prefix)
     suffixes = []
@@ -328,4 +340,5 @@ def _str(self):
     if self.has_names():
         suffixes.append('names={}'.format(self.names))
 
+    print("EE21")
     return _add_suffixes(prefix + tensor_str, suffixes, indent, force_newline=self.is_sparse)

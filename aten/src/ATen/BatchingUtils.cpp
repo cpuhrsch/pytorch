@@ -42,7 +42,15 @@ Tensor moveBdimsToFront(const Tensor& self, BatchDimsRef bdims) {
     } 
     permutation[idx++] = ptr;
   }
-  return self.permute(permutation);
+  int64_t p0 = -1;
+  // If the indicies are already ordered a permutation is not necessary;
+  for (const auto& p : permutation) {
+    if ((p0 + 1) != p) {
+      return self.permute(permutation);
+    }
+    p0 = p;
+  }
+  return self;
 }
 
 std::pair<Tensor, BatchDimsRef> unpackBatched(const Tensor& self) {
