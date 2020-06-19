@@ -4006,9 +4006,11 @@ def multi_head_attention_forward(query,                           # type: Nested
     if v is not None:
         v = v.reshape(-1, -1, num_heads, head_dim).transpose(1, 2)
 
-    assert static_k is None
+    if static_k is not None:
+        assert static_k is None
 
-    assert static_v is None
+    if static_v is not None:
+        assert static_v is None
 
     assert key_padding_mask is None
 
