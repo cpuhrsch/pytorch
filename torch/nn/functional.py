@@ -4012,15 +4012,19 @@ def multi_head_attention_forward(query,                           # type: Nested
     if static_v is not None:
         assert static_v is None
 
-    assert key_padding_mask is None
+    if key_padding_mask is not None:
+        assert key_padding_mask is None
 
-    assert not add_zero_attn
+    if add_zero_attn:
+        assert not add_zero_attn
 
     attn_output_weights = torch.matmul(q, k.transpose(2, 3))
 
-    assert attn_mask is None
+    if attn_mask is not None:
+        assert attn_mask is None
 
-    assert key_padding_mask is None
+    if key_padding_mask is not None:
+        assert key_padding_mask is None
 
     attn_output_weights = softmax(
         attn_output_weights, dim=-1)
