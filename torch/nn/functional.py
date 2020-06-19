@@ -3992,11 +3992,11 @@ def multi_head_attention_forward(query,                           # type: Nested
     else:
         assert not use_separate_proj_weight
 
+    q = q * scaling
+
     if bias_k is not None and bias_v is not None:
         assert bias_k is None
         assert bias_v is None
-
-    q = q * scaling
 
     # NOTE: This is usually contiguous plus a view
     q = q.reshape(-1, -1, num_heads, head_dim).transpose(1, 2)
