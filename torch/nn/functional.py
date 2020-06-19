@@ -3991,7 +3991,6 @@ def multi_head_attention_forward(query,                           # type: Nested
             v = linear(value, _w, _b)
     else:
         assert not use_separate_proj_weight
-
     q = q * scaling
 
     if bias_k is not None and bias_v is not None:
