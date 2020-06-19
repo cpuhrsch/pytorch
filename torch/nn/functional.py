@@ -4033,4 +4033,5 @@ def multi_head_attention_forward(query,                           # type: Nested
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
     if need_weights:
         assert not need_weights
-    return attn_output, None
+    else:
+        return attn_output, None
