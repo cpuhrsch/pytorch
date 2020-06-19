@@ -3948,7 +3948,6 @@ def multi_head_attention_forward(query,                           # type: Nested
     assert torch.is_tensor(out_proj_bias)
 
     # TODO: Explicitly unsupported flags
-    assert not use_separate_proj_weight
     assert attn_mask is None
     assert key_padding_mask is None
     assert bias_k is None
@@ -3968,32 +3967,35 @@ def multi_head_attention_forward(query,                           # type: Nested
     scaling = float(head_dim) ** -0.5
 
 
-    # This is inline in_proj function with in_proj_weight and in_proj_bias
-    _b = in_proj_bias
-    _start = 0
-    _end = embed_dim
-    _w = in_proj_weight[_start:_end, :]
-    if _b is not None:
-        _b = _b[_start:_end]
-    q = F.linear(query, _w, _b)
+    if not use_separate_proj_weight:
+        assert not use_separate_proj_weight
+    else:
+        # This is inline in_proj function with in_proj_weight and in_proj_bias
+        _b = in_proj_bias
+        _start = 0
+        _end = embed_dim
+        _w = in_proj_weight[_start:_end, :]
+        if _b is not None:
+            _b = _b[_start:_end]
+        q = F.linear(query, _w, _b)
 
-    # This is inline in_proj function with in_proj_weight and in_proj_bias
-    _b = in_proj_bias
-    _start = embed_dim
-    _end = embed_dim * 2
-    _w = in_proj_weight[_start:_end, :]
-    if _b is not None:
-        _b = _b[_start:_end]
-    k = F.linear(key, _w, _b)
+        # This is inline in_proj function with in_proj_weight and in_proj_bias
+        _b = in_proj_bias
+        _start = embed_dim
+        _end = embed_dim * 2
+        _w = in_proj_weight[_start:_end, :]
+        if _b is not None:
+            _b = _b[_start:_end]
+        k = F.linear(key, _w, _b)
 
-    # This is inline in_proj function with in_proj_weight and in_proj_bias
-    _b = in_proj_bias
-    _start = embed_dim * 2
-    _end = None
-    _w = in_proj_weight[_start:, :]
-    if _b is not None:
-        _b = _b[_start:]
-    v = F.linear(value, _w, _b)
+        # This is inline in_proj function with in_proj_weight and in_proj_bias
+        _b = in_proj_bias
+        _start = embed_dim * 2
+        _end = None
+        _w = in_proj_weight[_start:, :]
+        if _b is not None:
+            _b = _b[_start:]
+        v = F.linear(value, _w, _b)
     q = q * scaling
 
     # NOTE: This is usually contiguous plus a view
