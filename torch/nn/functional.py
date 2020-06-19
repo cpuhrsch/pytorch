@@ -3947,11 +3947,6 @@ def multi_head_attention_forward(query,                           # type: Nested
     assert torch.is_tensor(out_proj_weight)
     assert torch.is_tensor(out_proj_bias)
 
-    # TODO: Explicitly unsupported flags
-    assert bias_k is None
-    assert bias_v is None
-    assert not need_weights
-
     bsz, tgt_len, embed_dim = query.size()
     assert embed_dim == embed_dim_to_check
     # allow MHA to have different sizes for the feature dimension
@@ -3997,6 +3992,10 @@ def multi_head_attention_forward(query,                           # type: Nested
     else:
         assert not use_separate_proj_weight
 
+    if bias_k is not None and bias_v is not None:
+        assert bias_k is None
+        assert bias_v is None
+
     q = q * scaling
 
     # NOTE: This is usually contiguous plus a view
@@ -4033,4 +4032,6 @@ def multi_head_attention_forward(query,                           # type: Nested
     attn_output = torch.matmul(attn_output_weights, v)
     attn_output = attn_output.transpose(1, 2).reshape(-1, -1, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
+    if need_weights:
+        assert not need_weights
     return attn_output, None
