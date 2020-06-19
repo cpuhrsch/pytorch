@@ -3948,11 +3948,8 @@ def multi_head_attention_forward(query,                           # type: Nested
     assert torch.is_tensor(out_proj_bias)
 
     # TODO: Explicitly unsupported flags
-    assert attn_mask is None
-    assert key_padding_mask is None
     assert bias_k is None
     assert bias_v is None
-    assert not add_zero_attn
     assert not need_weights
 
     bsz, tgt_len, embed_dim = query.size()
@@ -4013,14 +4010,23 @@ def multi_head_attention_forward(query,                           # type: Nested
 
     assert static_v is None
 
+    assert key_padding_mask is None
+
+    assert not add_zero_attn
+
     attn_output_weights = torch.matmul(q, k.transpose(2, 3))
+
+    assert attn_mask is None
+
+    assert key_padding_mask is None
+
     attn_output_weights = softmax(
         attn_output_weights, dim=-1)
     attn_output_weights = dropout(
         attn_output_weights, p=dropout_p, training=training)
     attn_output = torch.matmul(attn_output_weights, v)
     attn_output = attn_output.transpose(1, 2).reshape(-1, -1, embed_dim)
-    attn_output = F.linear(attn_output, out_proj_weight, out_proj_bias)
+    attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
     return attn_output, None
 
 
