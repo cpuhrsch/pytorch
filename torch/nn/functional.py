@@ -3952,8 +3952,6 @@ def multi_head_attention_forward(query,                           # type: Nested
     assert key_padding_mask is None
     assert bias_k is None
     assert bias_v is None
-    assert static_k is None
-    assert static_v is None
     assert not add_zero_attn
     assert not need_weights
 
@@ -3980,7 +3978,7 @@ def multi_head_attention_forward(query,                           # type: Nested
             _w = in_proj_weight[_start:_end, :]
             if _b is not None:
                 _b = _b[_start:_end]
-            q = F.linear(query, _w, _b)
+            q = linear(query, _w, _b)
 
             # This is inline in_proj function with in_proj_weight and in_proj_bias
             _b = in_proj_bias
@@ -3989,7 +3987,7 @@ def multi_head_attention_forward(query,                           # type: Nested
             _w = in_proj_weight[_start:_end, :]
             if _b is not None:
                 _b = _b[_start:_end]
-            k = F.linear(key, _w, _b)
+            k = linear(key, _w, _b)
 
             # This is inline in_proj function with in_proj_weight and in_proj_bias
             _b = in_proj_bias
@@ -3998,7 +3996,7 @@ def multi_head_attention_forward(query,                           # type: Nested
             _w = in_proj_weight[_start:, :]
             if _b is not None:
                 _b = _b[_start:]
-            v = F.linear(value, _w, _b)
+            v = linear(value, _w, _b)
     else:
         assert not use_separate_proj_weight
 
@@ -4010,10 +4008,15 @@ def multi_head_attention_forward(query,                           # type: Nested
         k = k.reshape(-1, -1, num_heads, head_dim).transpose(1, 2)
     if v is not None:
         v = v.reshape(-1, -1, num_heads, head_dim).transpose(1, 2)
+
+    assert static_k is None
+
+    assert static_v is None
+
     attn_output_weights = torch.matmul(q, k.transpose(2, 3))
-    attn_output_weights = F.softmax(
+    attn_output_weights = softmax(
         attn_output_weights, dim=-1)
-    attn_output_weights = F.dropout(
+    attn_output_weights = dropout(
         attn_output_weights, p=dropout_p, training=training)
     attn_output = torch.matmul(attn_output_weights, v)
     attn_output = attn_output.transpose(1, 2).reshape(-1, -1, embed_dim)
