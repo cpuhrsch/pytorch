@@ -37,7 +37,9 @@ variable_list ${op}::apply(variable_list&& grads) {
   ${thread_lock}
   ${asserts}
   IndexRangeGenerator gen;
+  std::cout << "Running backwards op: ${op}" << std::endl;
   ${compute_index_ranges}
+  std::cout << "gen.size(): " << gen.size() << std::endl;
   variable_list grad_inputs(gen.size());
   ${body}
   return grad_inputs;
@@ -194,7 +196,7 @@ def process_function(func):
     body = []
 
     if uses_single_grad(func):
-        body.append('auto& grad = grads[0];')
+        body.append('auto& grad = grads[0]; std::cout << "grad.sizes(): " << grad.sizes() << std::endl;')
 
     def emit_derivative(derivative, args_with_derivatives):
         formula = derivative['formula']

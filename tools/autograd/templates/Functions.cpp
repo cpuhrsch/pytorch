@@ -57,12 +57,14 @@ struct IndexRangeGenerator {
 };
 
 void copy_range(variable_list& out, IndexRange range, const Tensor & t) {
+  std::cout << "copy_range Tensor of sizess" << t.sizes() << std::endl;
   AT_ASSERT(range.second <= out.size());
   AT_ASSERTM(range.second - range.first == 1, "inconsistent range for Tensor output");
   out[range.first] = t;
 }
 
 void copy_range(variable_list& out, IndexRange range, at::ArrayRef<Tensor> t) {
+  std::cout << "copy_range ArrayRef<Tensor>" << std::endl;
   AT_ASSERT(range.second <= out.size());
   AT_ASSERTM(range.second - range.first == t.size(), "inconsistent range for TensorList output");
   std::copy(t.begin(), t.end(), out.begin() + range.first);
@@ -74,6 +76,7 @@ Tensor not_implemented(const char* name) {
 }
 
 Tensor maybe_multiply(const Tensor & t, const Scalar & s) {
+  std::cout << "calling maybe_multiply" << std::endl;
   bool is_one = false;
   if (s.isFloatingPoint()) {
     is_one = s.toDouble() == 1;
@@ -567,6 +570,8 @@ Tensor unbind_backward(const variable_list& grads, int64_t dim) {
 }
 
 Tensor unsqueeze_to(const Tensor & self, IntArrayRef sizes) {
+  // TODO: make this a native function?
+  TORCH_CHECK(false, "Calling unsqueeze_to.");
   auto result = self;
 
   int64_t nDims = sizes.size();
@@ -579,6 +584,8 @@ Tensor unsqueeze_to(const Tensor & self, IntArrayRef sizes) {
 }
 
 Tensor unsqueeze_to(const Tensor & self, int64_t dim, IntArrayRef sizes) {
+  // TODO: make this a native function?
+  TORCH_CHECK(false, "Calling unsqueeze_to.");
   dim = at::maybe_wrap_dim(dim, sizes.size());
   // in NumPy it's not an error to unsqueeze a scalar, but we still need to avoided
   // unsqueezing in the backward.
