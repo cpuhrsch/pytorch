@@ -363,7 +363,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_cpu(const Tensor& input, const Ten
 
   output = input;
   output = output - mean.reshape(IntArrayRef(scalar_shape));
-  output = output / invstd.reshape(IntArrayRef(scalar_shape));
+  output = output * invstd.reshape(IntArrayRef(scalar_shape));
 
   if (weight.defined()) {
     output = output * weight.reshape(IntArrayRef(scalar_shape));
