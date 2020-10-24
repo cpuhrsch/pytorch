@@ -60,37 +60,6 @@ struct Var {
 };
 
 template<typename scalar_t>
-void batch_norm_cpu_inference_collect_linear_and_constant_terms(
-    scalar_t* alpha, scalar_t* beta, int64_t n_channel,
-    const Tensor& weight /* optional */, const Tensor& bias /* optional */,
-    const Tensor& mean, const Tensor& variance, double eps) {
-
-  const scalar_t* weight_data = weight.defined() ? weight.data_ptr<scalar_t>() : nullptr;
-  const scalar_t* bias_data = bias.defined() ? bias.data_ptr<scalar_t>() : nullptr;
-  const scalar_t* mean_data = mean.data_ptr<scalar_t>();
-  const scalar_t* var_data = variance.data_ptr<scalar_t>();
-
-  /// Collect the linear and constant terms regarding the input.
-  /// output(n, c, h, w)
-  ///     = (input(n, c, h, w) - mean(c)) / sqrt(var(c) + eps) * weight(c)
-  ///         + bias(c)
-  ///     = input(n, c, h, w) * inv_var(c) * weight(c)
-  ///         - mean(c) * inv_var(c) * weight(c) + bias(c),
-  /// where inv_var(c) = 1 / sqrt(var(c) + eps).
-  /// So the linear term, alpha(c) = inv_var(c) * weight(c),
-  ///   the constant term beta(c) = bias(c) - mean(c) * inv_var(c) * weight(c)
-  /// Note that this is only a good idea if (input_size >> c), in degenerate
-  /// cases where image_size == 1 && batch_size == 1, it is slow.
-  for (int64_t c = 0; c < n_channel; c++) {
-    scalar_t inv_var = 1 / std::sqrt(var_data[c] + static_cast<scalar_t>(eps));
-    scalar_t weight_v = weight_data ? weight_data[c] : 1;
-    scalar_t bias_v = bias_data ? bias_data[c] : 0;
-    alpha[c] = inv_var * weight_v;
-    beta[c] = bias_v - mean_data[c] * inv_var * weight_v;
-  }
-}
-
-template<typename scalar_t>
 std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
     const Tensor& input, const Tensor& weight, const Tensor& bias,
     const Tensor& save_mean /* optional */, const Tensor& save_invstd /* optional */,
@@ -100,12 +69,6 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
   Tensor output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
   int64_t n_input = input.size(1);
-
-  // auto save_mean_a = conditional_accessor_1d<scalar_t>(save_mean);
-  // auto save_invstd_a = conditional_accessor_1d<scalar_t>(save_invstd);
-
-  // auto running_mean_a = conditional_accessor_1d<scalar_t>(running_mean);
-  // auto running_var_a = conditional_accessor_1d<scalar_t>(running_var);
 
   at::Tensor mean;
   at::Tensor invstd;
@@ -118,33 +81,7 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
   }
   output = input;
   output = output - mean.reshape({1, n_input, 1, 1});
-  output = output * invstd;
-
-  // parallel_for(0, n_input, 1, [&](int64_t b_begin, int64_t b_end) {
-  //   for (int64_t f = b_begin; f < b_end; ++f) {
-  //     Tensor in = input.select(1, f);
-  //     Tensor out = output.select(1, f);
-
-  //     scalar_t mean, invstd;
-  //     if (train) {
-  //       mean = save_mean_a[f];
-  //       invstd = save_invstd_a[f];
-  //     } else {
-  //       mean = running_mean_a[f];
-  //       invstd = 1 / std::sqrt(running_var_a[f] + eps);
-  //     }
-
-  //     // // compute output
-  //     // scalar_t w = weight.defined() ? weight.data_ptr<scalar_t>()[f * weight.stride(0)] : 1;
-  //     // scalar_t b = bias.defined() ? bias.data_ptr<scalar_t>()[f * bias.stride(0)] : 0;
-
-  //     auto iter = TensorIterator::unary_op(out, in);
-  //     cpu_serial_kernel(iter, [=](const scalar_t i) -> scalar_t {
-  //       // return ((i - mean) * invstd) * w + b;
-  //       return ((i - mean) * invstd);
-  //     });
-  //   }
-  // });
+  output = output * invstd.reshape({1, n_input, 1, 1});
 
   if (weight.defined()) {
     output = output * weight.reshape({1, n_input, 1, 1});
@@ -165,7 +102,7 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
   int64_t n_input = input.size(1);
   int64_t n = input.numel() / n_input;
 
-  Tensor save_mean = at::empty({n_input}, input.options());
+  Tensor save_mean = at::mean(input, {0, 2, 3});
   Tensor save_var_transform = at::empty({n_input}, input.options());
   auto save_mean_a = save_mean.accessor<scalar_t, 1>();
   auto save_var_transform_a = save_var_transform.accessor<scalar_t, 1>();
@@ -177,20 +114,21 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
     for (int64_t f = b_begin; f < b_end; ++f) {
       Tensor in = input.select(1, f);
 
-      // compute mean per input
-      auto iter = TensorIteratorConfig()
-        .add_input(in)
-        .build();
-      accscalar_t sum = 0;
-      cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
-        sum += i;
-      });
-      scalar_t mean = sum / n;
-      save_mean_a[f] = mean;
+      // // compute mean per input
+      // auto iter = TensorIteratorConfig()
+      //   .add_input(in)
+      //   .build();
+      // accscalar_t sum = 0;
+      // cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
+      //   sum += i;
+      // });
+      // scalar_t mean = sum / n;
+      // save_mean_a[f] = mean;
+      scalar_t mean = save_mean_a[f];
 
       // compute variance per input
       accscalar_t var_sum = 0;
-      iter = TensorIteratorConfig()
+      auto iter = TensorIteratorConfig()
         .add_input(in)
         .build();
       cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
