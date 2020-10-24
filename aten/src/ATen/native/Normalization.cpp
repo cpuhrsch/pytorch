@@ -90,90 +90,12 @@ void batch_norm_cpu_inference_collect_linear_and_constant_terms(
   }
 }
 
-/// A fast path for CPU inference when all tensors are channels last contiguous.
-/// This code achieves machine bandwidth peak without AVX support.
-/// If this changes for future architectures, we can move it to the cpu/
-/// directory.
-template<typename scalar_t>
-void batch_norm_cpu_inference_channels_last(Tensor& output, const Tensor& input,
-    const Tensor& weight /* optional */, const Tensor& bias /* optional */,
-    const Tensor& mean, const Tensor& variance, double eps) {
-
-  int64_t n_batch = input.size(0);
-  int64_t n_channel = input.size(1);
-  int64_t image_size = input.numel() / n_batch / n_channel;
-
-  scalar_t* output_data = output.data_ptr<scalar_t>();
-  const scalar_t* input_data = input.data_ptr<scalar_t>();
-
-  Tensor alpha = at::empty_like(mean, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  Tensor beta = at::empty_like(mean, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  scalar_t* alpha_data = alpha.data_ptr<scalar_t>();
-  scalar_t* beta_data = beta.data_ptr<scalar_t>();
-
-  batch_norm_cpu_inference_collect_linear_and_constant_terms<scalar_t>(
-      alpha_data, beta_data, n_channel, weight, bias, mean, variance, eps);
-
-  // Apply the linear terms to the input,
-  // output(n, c, h, w) = input(n, c, h, w) * alpha(c) + beta(c)
-  // No need to use parallel_for as this function is supposed to be
-  // memory-limited.
-  // Keep the loop struture simple to make sure compiler vectorization kicks in.
-  if (n_channel != 1) {
-    for (int64_t n = 0; n < n_batch; ++n) {
-      for (int64_t i = 0; i < image_size; ++i) {
-        for (int64_t c = 0; c < n_channel; ++c) {
-          // Keep all the offset calculation within the inner loop for
-          // simplicity. Compilers are very good at hoisting the common part
-          // outside.
-          int64_t offset = n * image_size * n_channel + i * n_channel + c;
-          output_data[offset] = input_data[offset] * alpha_data[c] + beta_data[c];
-        }
-      }
-    }
-  } else {
-    // n_channel == 1
-    for (int64_t n = 0; n < n_batch; ++n) {
-      for (int64_t i = 0; i < image_size; ++i) {
-        int64_t offset = n * image_size + i;
-        output_data[offset] = input_data[offset] * alpha_data[0] + beta_data[0];
-      }
-    }
-  }
-}
-
 template<typename scalar_t>
 std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
     const Tensor& input, const Tensor& weight, const Tensor& bias,
     const Tensor& save_mean /* optional */, const Tensor& save_invstd /* optional */,
     const Tensor& running_mean /* optional */, const Tensor& running_var /* optional */,
     bool train, double eps) {
-
-  // // Check if we should use the fast path for contiguous memory format
-  // if (!train && input.is_contiguous()
-  //     && (!weight.defined() || weight.is_contiguous())
-  //     && (!bias.defined() || bias.is_contiguous())
-  //     && running_mean.is_contiguous()
-  //     && running_var.is_contiguous()) {
-
-  //   Tensor output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  //   batch_norm_cpu_inference_contiguous_stub(kCPU, output, input, weight,
-  //       bias, running_mean, running_var, eps);
-  //   return std::make_tuple(output, save_mean, save_invstd);
-  // }
-
-  // // Check if we should use the fast path for channel last memory format
-  // if (!train && input.is_contiguous(at::MemoryFormat::ChannelsLast)
-  //     && (!weight.defined() || weight.is_contiguous())
-  //     && (!bias.defined() || bias.is_contiguous())
-  //     && running_mean.is_contiguous()
-  //     && running_var.is_contiguous()) {
-
-  //   Tensor output = at::empty_like(input, at::MemoryFormat::ChannelsLast);
-  //   batch_norm_cpu_inference_channels_last<scalar_t>(
-  //     output, input, weight, bias, running_mean, running_var, eps);
-  //   return std::make_tuple(output, save_mean, save_invstd);
-  // }
 
   Tensor output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
@@ -413,55 +335,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, int64_t> _batch_norm_impl_index(
     check_dims_match_num_input_features("bias", num_features, bias.numel());
   }
 
-  // bool use_cudnn = false;
-  // use_cudnn = (input.is_cuda()
-  //              && (input.scalar_type() != at::kHalf
-  //                || weight.scalar_type() == at::kFloat)
-  //              && weight.defined() && bias.defined()
-  //              && ((running_mean.defined() && running_var.defined())
-  //                || (!running_mean.defined() && !running_var.defined() && training))
-  //              && ((input.dim() == 2 && input.size(0) <= 131070 && training) // per-activation, training
-  //                || (input.dim() == 2 && input.size(0) <= 262136 && !training) // per-activation, eval
-  //                || (input.dim() >= 3 && input.size(0) <= 880801 && training) // spatial, training
-  //                || (input.dim() >= 3 && input.size(0) <= 65535 && !training)) //spatial, eval
-  //              && detail::getCUDAHooks().compiledWithCuDNN()
-  //              && cudnn_enabled && detail::getCUDAHooks().versionCuDNN() >= 5110L);
-
-  // if (use_cudnn && eps >= detail::getCUDAHooks().batchnormMinEpsilonCuDNN()) {
-  //   return std::tuple_cat(
-  //            at::cudnn_batch_norm(
-  //              input.contiguous(input.suggest_memory_format()), weight.contiguous(),
-  //              bias.contiguous(),
-  //              running_mean.defined() ? running_mean.contiguous() : running_mean,
-  //              running_var.defined() ? running_var.contiguous() : running_var,
-  //              training, momentum, eps),
-  //            std::make_tuple(1));
-  // }
-
   Tensor reserve = at::empty({0}, input.options().dtype(kByte));
-
-  // bool use_miopen = (input.is_cuda()
-  //              && input.dim() <= MIOPEN_DIM_MAX
-  //              && input.scalar_type() != at::kDouble
-  //              && input.scalar_type() != at::kBFloat16
-  //              && (weight.scalar_type() != at::kHalf)
-  //              && weight.defined() && bias.defined()
-  //              && ((running_mean.defined() && running_var.defined())
-  //                || (!running_mean.defined() && !running_var.defined() && training))
-  //              && detail::getCUDAHooks().compiledWithMIOpen()
-  //              && cudnn_enabled
-  //              );
-
-  // if (use_miopen) {
-  //   return std::tuple_cat(
-  //            at::miopen_batch_norm(
-  //              input.contiguous(), weight.contiguous(), bias.contiguous(),
-  //              running_mean.defined() ? running_mean.contiguous() : running_mean,
-  //              running_var.defined() ? running_var.contiguous() : running_var,
-  //              training, momentum, eps),
-  //            std::tuple<Tensor>(reserve),
-  //            std::make_tuple(2));
-  // }
 
   return std::tuple_cat(
            at::native_batch_norm(
