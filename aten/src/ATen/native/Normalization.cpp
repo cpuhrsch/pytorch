@@ -41,7 +41,6 @@ static TensorAccessor<scalar_t, 1> conditional_accessor_1d(const Tensor& t) {
   return t.accessor<scalar_t, 1>();
 }
 
-template<typename T>
 struct InvStd {
   at::Tensor operator()(at::Tensor var, double epsilon) const {
     at::Tensor invstd = 1 / at::sqrt(var + epsilon);
@@ -49,7 +48,6 @@ struct InvStd {
   }
 };
 
-template<typename T>
 struct Var {
   at::Tensor operator()(at::Tensor var, double epsilon) const {
     return var;
@@ -109,7 +107,7 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
   return std::make_tuple(output, save_mean, save_invstd);
 }
 
-template<typename scalar_t, template<typename T> class VarTransform>
+template<typename scalar_t, class VarTransform>
 std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
     const Tensor& input, const Tensor& running_mean, const Tensor& running_var,
     double momentum, double eps) {
@@ -126,7 +124,7 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
             (input - save_mean.reshape(IntArrayRef(scalar_shape))),
             IntArrayRef(reduce_dims));
 
-  Tensor save_var_transform = VarTransform<accscalar_t>{}(var_sum / n, eps);
+  Tensor save_var_transform = VarTransform{}(var_sum / n, eps);
 
   if (running_mean.defined()) {
     running_mean.copy_(momentum * save_mean + (1 - momentum) * running_mean);
