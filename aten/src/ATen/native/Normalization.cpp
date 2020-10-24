@@ -339,7 +339,21 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_cpu(const Tensor& input, const Ten
   at::Tensor save_invstd;
 
   if (train) {
-    std::tie(save_mean, save_invstd) = batch_norm_cpu_update_stats_template<InvStd>(input, running_mean, running_var, momentum, eps);
+    auto reduce_dims = make_reduce_dims(input.dim());
+    save_mean = at::mean(input, IntArrayRef(reduce_dims));
+
+    save_invstd = 1 / at::sqrt(
+        at::var(input, IntArrayRef(reduce_dims), false) + eps);
+
+    if (running_mean.defined()) {
+      running_mean.copy_(momentum * save_mean + (1 - momentum) * running_mean);
+    }
+
+    if (running_var.defined()) {
+      Tensor unbiased_var = at::var(input, IntArrayRef(reduce_dims));
+      running_var.copy_(momentum * unbiased_var + (1 - momentum) * running_var);
+    }
+
     mean = save_mean;
     invstd = save_invstd;
   } else {
@@ -349,7 +363,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_cpu(const Tensor& input, const Ten
 
   output = input;
   output = output - mean.reshape(IntArrayRef(scalar_shape));
-  output = output * invstd.reshape(IntArrayRef(scalar_shape));
+  output = output / invstd.reshape(IntArrayRef(scalar_shape));
 
   if (weight.defined()) {
     output = output * weight.reshape(IntArrayRef(scalar_shape));
