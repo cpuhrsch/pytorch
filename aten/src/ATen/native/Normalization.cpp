@@ -119,19 +119,15 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
   auto scalar_shape = make_scalar_shape(input.dim(), n_input);
   Tensor save_mean = at::mean(input, IntArrayRef(reduce_dims));
 
-  Tensor var_sum =
-    at::sum((input - save_mean.reshape(IntArrayRef(scalar_shape))) *
-            (input - save_mean.reshape(IntArrayRef(scalar_shape))),
-            IntArrayRef(reduce_dims));
-
-  Tensor save_var_transform = VarTransform{}(var_sum / n, eps);
+  Tensor save_var_transform = VarTransform{}(
+      at::var(input, IntArrayRef(reduce_dims), false), eps);
 
   if (running_mean.defined()) {
     running_mean.copy_(momentum * save_mean + (1 - momentum) * running_mean);
   }
 
   if (running_var.defined()) {
-    Tensor unbiased_var = var_sum / (n - 1);
+    Tensor unbiased_var = at::var(input, IntArrayRef(reduce_dims));
     running_var.copy_(momentum * unbiased_var + (1 - momentum) * running_var);
   }
   return std::make_tuple(save_mean, save_var_transform);
