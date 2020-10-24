@@ -59,6 +59,25 @@ struct Var {
   }
 };
 
+std::vector<int64_t> make_reduce_dims(int64_t input_dim) {
+  std::vector<int64_t> result;
+  result.push_back(0);
+  for (int64_t i = 2; i < input_dim; i++) {
+    result.push_back(i);
+  }
+  return result;
+}
+
+std::vector<int64_t> make_scalar_shape(int64_t input_dim, int64_t n_input) {
+  std::vector<int64_t> result;
+  result.push_back(1);
+  result.push_back(n_input);
+  for (int64_t i = 2; i < input_dim; i++) {
+    result.push_back(1);
+  }
+  return result;
+}
+
 template<typename scalar_t>
 std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
     const Tensor& input, const Tensor& weight, const Tensor& bias,
@@ -69,6 +88,7 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
   Tensor output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
   int64_t n_input = input.size(1);
+  auto scalar_shape = make_scalar_shape(input.dim(), n_input);
 
   at::Tensor mean;
   at::Tensor invstd;
@@ -80,14 +100,14 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
     invstd = 1 / at::sqrt(running_var + eps);
   }
   output = input;
-  output = output - mean.reshape({1, n_input, 1, 1});
-  output = output * invstd.reshape({1, n_input, 1, 1});
+  output = output - mean.reshape(IntArrayRef(scalar_shape));
+  output = output * invstd.reshape(IntArrayRef(scalar_shape));
 
   if (weight.defined()) {
-    output = output * weight.reshape({1, n_input, 1, 1});
+    output = output * weight.reshape(IntArrayRef(scalar_shape));
   }
   if (bias.defined()) {
-    output = output + bias.reshape({1, n_input, 1, 1});
+    output = output + bias.reshape(IntArrayRef(scalar_shape));
   }
   return std::make_tuple(output, save_mean, save_invstd);
 }
@@ -102,8 +122,14 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
   int64_t n_input = input.size(1);
   int64_t n = input.numel() / n_input;
 
-  Tensor save_mean = at::mean(input, {0, 2, 3});
-  Tensor save_var_transform = at::empty({n_input}, input.options());
+  auto reduce_dims = make_reduce_dims(input.dim());
+  auto scalar_shape = make_scalar_shape(input.dim(), n_input);
+  Tensor save_mean = at::mean(input, IntArrayRef(reduce_dims));
+  // Tensor save_var_transform = at::empty({n_input}, input.options());
+  Tensor save_var_transform = 
+    at::sum((input - save_mean.reshape(IntArrayRef(scalar_shape))) *
+            (input - save_mean.reshape(IntArrayRef(scalar_shape))),
+            IntArrayRef(reduce_dims));
   auto save_mean_a = save_mean.accessor<scalar_t, 1>();
   auto save_var_transform_a = save_var_transform.accessor<scalar_t, 1>();
 
@@ -134,6 +160,7 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
       cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
         var_sum += (i - mean) * (i - mean);
       });
+      // scalar_t var_sum = save_var_transform_a[f];
       save_var_transform_a[f] = VarTransform<accscalar_t>{}(var_sum / n, eps);
 
       // update running averages
