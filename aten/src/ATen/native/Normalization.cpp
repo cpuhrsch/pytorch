@@ -101,37 +101,51 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
 
   int64_t n_input = input.size(1);
 
-  auto save_mean_a = conditional_accessor_1d<scalar_t>(save_mean);
-  auto save_invstd_a = conditional_accessor_1d<scalar_t>(save_invstd);
+  // auto save_mean_a = conditional_accessor_1d<scalar_t>(save_mean);
+  // auto save_invstd_a = conditional_accessor_1d<scalar_t>(save_invstd);
 
-  auto running_mean_a = conditional_accessor_1d<scalar_t>(running_mean);
-  auto running_var_a = conditional_accessor_1d<scalar_t>(running_var);
+  // auto running_mean_a = conditional_accessor_1d<scalar_t>(running_mean);
+  // auto running_var_a = conditional_accessor_1d<scalar_t>(running_var);
 
-  parallel_for(0, n_input, 1, [&](int64_t b_begin, int64_t b_end) {
-    for (int64_t f = b_begin; f < b_end; ++f) {
-      Tensor in = input.select(1, f);
-      Tensor out = output.select(1, f);
+  at::Tensor mean;
+  at::Tensor invstd;
+  if (train) {
+    mean = save_mean;
+    invstd = save_invstd;
+  } else {
+    mean = running_mean;
+    invstd = 1 / at::sqrt(running_var + eps);
+  }
+  output = input;
+  output = output - mean.reshape({1, n_input, 1, 1});
+  output = output * invstd;
 
-      scalar_t mean, invstd;
-      if (train) {
-        mean = save_mean_a[f];
-        invstd = save_invstd_a[f];
-      } else {
-        mean = running_mean_a[f];
-        invstd = 1 / std::sqrt(running_var_a[f] + eps);
-      }
+  // parallel_for(0, n_input, 1, [&](int64_t b_begin, int64_t b_end) {
+  //   for (int64_t f = b_begin; f < b_end; ++f) {
+  //     Tensor in = input.select(1, f);
+  //     Tensor out = output.select(1, f);
 
-      // // compute output
-      // scalar_t w = weight.defined() ? weight.data_ptr<scalar_t>()[f * weight.stride(0)] : 1;
-      // scalar_t b = bias.defined() ? bias.data_ptr<scalar_t>()[f * bias.stride(0)] : 0;
+  //     scalar_t mean, invstd;
+  //     if (train) {
+  //       mean = save_mean_a[f];
+  //       invstd = save_invstd_a[f];
+  //     } else {
+  //       mean = running_mean_a[f];
+  //       invstd = 1 / std::sqrt(running_var_a[f] + eps);
+  //     }
 
-      auto iter = TensorIterator::unary_op(out, in);
-      cpu_serial_kernel(iter, [=](const scalar_t i) -> scalar_t {
-        // return ((i - mean) * invstd) * w + b;
-        return ((i - mean) * invstd);
-      });
-    }
-  });
+  //     // // compute output
+  //     // scalar_t w = weight.defined() ? weight.data_ptr<scalar_t>()[f * weight.stride(0)] : 1;
+  //     // scalar_t b = bias.defined() ? bias.data_ptr<scalar_t>()[f * bias.stride(0)] : 0;
+
+  //     auto iter = TensorIterator::unary_op(out, in);
+  //     cpu_serial_kernel(iter, [=](const scalar_t i) -> scalar_t {
+  //       // return ((i - mean) * invstd) * w + b;
+  //       return ((i - mean) * invstd);
+  //     });
+  //   }
+  // });
+
   if (weight.defined()) {
     output = output * weight.reshape({1, n_input, 1, 1});
   }
