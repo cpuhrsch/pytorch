@@ -41,19 +41,6 @@ static TensorAccessor<scalar_t, 1> conditional_accessor_1d(const Tensor& t) {
   return t.accessor<scalar_t, 1>();
 }
 
-struct InvStd {
-  at::Tensor operator()(at::Tensor var, double epsilon) const {
-    at::Tensor invstd = 1 / at::sqrt(var + epsilon);
-    return invstd;
-  }
-};
-
-struct Var {
-  at::Tensor operator()(at::Tensor var, double epsilon) const {
-    return var;
-  }
-};
-
 std::vector<int64_t> make_reduce_dims(int64_t input_dim) {
   std::vector<int64_t> result;
   result.push_back(0);
@@ -72,6 +59,19 @@ std::vector<int64_t> make_scalar_shape(int64_t input_dim, int64_t n_input) {
   }
   return result;
 }
+
+struct InvStd {
+  at::Tensor operator()(at::Tensor var, double epsilon) const {
+    at::Tensor invstd = 1 / at::sqrt(var + epsilon);
+    return invstd;
+  }
+};
+
+struct Var {
+  at::Tensor operator()(at::Tensor var, double epsilon) const {
+    return var;
+  }
+};
 
 template<typename scalar_t>
 std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
