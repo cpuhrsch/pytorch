@@ -43,18 +43,15 @@ static TensorAccessor<scalar_t, 1> conditional_accessor_1d(const Tensor& t) {
 
 template<typename T>
 struct InvStd {
-  T operator()(T var, double epsilon) const {
-    T invstd = 0;
-    if (var != static_cast<T>(0) || epsilon != static_cast<T>(0)) {
-      invstd = static_cast<T>(1) / std::sqrt(var + epsilon);
-    }
+  at::Tensor operator()(at::Tensor var, double epsilon) const {
+    at::Tensor invstd = 1 / at::sqrt(var + epsilon);
     return invstd;
   }
 };
 
 template<typename T>
 struct Var {
-  T operator()(T var, double epsilon) const {
+  at::Tensor operator()(at::Tensor var, double epsilon) const {
     return var;
   }
 };
@@ -117,62 +114,28 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
     const Tensor& input, const Tensor& running_mean, const Tensor& running_var,
     double momentum, double eps) {
 
-  using accscalar_t = at::acc_type<scalar_t, false>;
-
   int64_t n_input = input.size(1);
   int64_t n = input.numel() / n_input;
 
   auto reduce_dims = make_reduce_dims(input.dim());
   auto scalar_shape = make_scalar_shape(input.dim(), n_input);
   Tensor save_mean = at::mean(input, IntArrayRef(reduce_dims));
-  // Tensor save_var_transform = at::empty({n_input}, input.options());
-  Tensor save_var_transform = 
+
+  Tensor var_sum =
     at::sum((input - save_mean.reshape(IntArrayRef(scalar_shape))) *
             (input - save_mean.reshape(IntArrayRef(scalar_shape))),
             IntArrayRef(reduce_dims));
-  auto save_mean_a = save_mean.accessor<scalar_t, 1>();
-  auto save_var_transform_a = save_var_transform.accessor<scalar_t, 1>();
 
-  auto running_mean_a = conditional_accessor_1d<scalar_t>(running_mean);
-  auto running_var_a = conditional_accessor_1d<scalar_t>(running_var);
+  Tensor save_var_transform = VarTransform<accscalar_t>{}(var_sum / n, eps);
 
-  parallel_for(0, n_input, 1, [&](int64_t b_begin, int64_t b_end) {
-    for (int64_t f = b_begin; f < b_end; ++f) {
-      Tensor in = input.select(1, f);
+  if (running_mean.defined()) {
+    running_mean.copy_(momentum * save_mean + (1 - momentum) * running_mean);
+  }
 
-      // // compute mean per input
-      // auto iter = TensorIteratorConfig()
-      //   .add_input(in)
-      //   .build();
-      // accscalar_t sum = 0;
-      // cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
-      //   sum += i;
-      // });
-      // scalar_t mean = sum / n;
-      // save_mean_a[f] = mean;
-      scalar_t mean = save_mean_a[f];
-
-      // // compute variance per input
-      // accscalar_t var_sum = 0;
-      // auto iter = TensorIteratorConfig()
-      //   .add_input(in)
-      //   .build();
-      // cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
-      //   var_sum += (i - mean) * (i - mean);
-      // });
-      scalar_t var_sum = save_var_transform_a[f];
-      save_var_transform_a[f] = VarTransform<accscalar_t>{}(var_sum / n, eps);
-
-      // update running averages
-      if (running_mean.defined()) {
-        running_mean_a[f] = momentum * mean + (1 - momentum) * running_mean_a[f];
-      }
-      if (running_var.defined()) {
-        accscalar_t unbiased_var = var_sum / (n - 1);
-        running_var_a[f] = momentum * unbiased_var + (1 - momentum) * running_var_a[f];
-      }
-    }
-  });
+  if (running_var.defined()) {
+    Tensor unbiased_var = var_sum / (n - 1);
+    running_var.copy_(momentum * unbiased_var + (1 - momentum) * running_var);
+  }
   return std::make_tuple(save_mean, save_var_transform);
 }
 
