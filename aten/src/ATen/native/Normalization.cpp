@@ -152,15 +152,15 @@ std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
       // save_mean_a[f] = mean;
       scalar_t mean = save_mean_a[f];
 
-      // compute variance per input
-      accscalar_t var_sum = 0;
-      auto iter = TensorIteratorConfig()
-        .add_input(in)
-        .build();
-      cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
-        var_sum += (i - mean) * (i - mean);
-      });
-      // scalar_t var_sum = save_var_transform_a[f];
+      // // compute variance per input
+      // accscalar_t var_sum = 0;
+      // auto iter = TensorIteratorConfig()
+      //   .add_input(in)
+      //   .build();
+      // cpu_serial_kernel(iter, [&](const scalar_t i) -> void {
+      //   var_sum += (i - mean) * (i - mean);
+      // });
+      scalar_t var_sum = save_var_transform_a[f];
       save_var_transform_a[f] = VarTransform<accscalar_t>{}(var_sum / n, eps);
 
       // update running averages
