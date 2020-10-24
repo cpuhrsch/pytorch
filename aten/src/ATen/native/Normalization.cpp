@@ -121,16 +121,23 @@ std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
         invstd = 1 / std::sqrt(running_var_a[f] + eps);
       }
 
-      // compute output
-      scalar_t w = weight.defined() ? weight.data_ptr<scalar_t>()[f * weight.stride(0)] : 1;
-      scalar_t b = bias.defined() ? bias.data_ptr<scalar_t>()[f * bias.stride(0)] : 0;
+      // // compute output
+      // scalar_t w = weight.defined() ? weight.data_ptr<scalar_t>()[f * weight.stride(0)] : 1;
+      // scalar_t b = bias.defined() ? bias.data_ptr<scalar_t>()[f * bias.stride(0)] : 0;
 
       auto iter = TensorIterator::unary_op(out, in);
       cpu_serial_kernel(iter, [=](const scalar_t i) -> scalar_t {
-        return ((i - mean) * invstd) * w + b;
+        // return ((i - mean) * invstd) * w + b;
+        return ((i - mean) * invstd);
       });
     }
   });
+  if (weight.defined()) {
+    output = output * weight.reshape({1, n_input, 1, 1});
+  }
+  if (bias.defined()) {
+    output = output + bias.reshape({1, n_input, 1, 1});
+  }
   return std::make_tuple(output, save_mean, save_invstd);
 }
 
