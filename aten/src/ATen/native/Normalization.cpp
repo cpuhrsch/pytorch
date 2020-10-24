@@ -73,39 +73,6 @@ struct Var {
   }
 };
 
-std::tuple<Tensor,Tensor,Tensor> batch_norm_cpu_transform_input_template(
-    const Tensor& input, const Tensor& weight, const Tensor& bias,
-    const Tensor& save_mean /* optional */, const Tensor& save_invstd /* optional */,
-    const Tensor& running_mean /* optional */, const Tensor& running_var /* optional */,
-    bool train, double eps) {
-
-  Tensor output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-
-  int64_t n_input = input.size(1);
-  auto scalar_shape = make_scalar_shape(input.dim(), n_input);
-
-  at::Tensor mean;
-  at::Tensor invstd;
-  if (train) {
-    mean = save_mean;
-    invstd = save_invstd;
-  } else {
-    mean = running_mean;
-    invstd = 1 / at::sqrt(running_var + eps);
-  }
-  output = input;
-  output = output - mean.reshape(IntArrayRef(scalar_shape));
-  output = output * invstd.reshape(IntArrayRef(scalar_shape));
-
-  if (weight.defined()) {
-    output = output * weight.reshape(IntArrayRef(scalar_shape));
-  }
-  if (bias.defined()) {
-    output = output + bias.reshape(IntArrayRef(scalar_shape));
-  }
-  return std::make_tuple(output, save_mean, save_invstd);
-}
-
 template<class VarTransform>
 std::tuple<Tensor,Tensor> batch_norm_cpu_update_stats_template(
     const Tensor& input, const Tensor& running_mean, const Tensor& running_var,
@@ -356,17 +323,41 @@ std::tuple<Tensor, Tensor> batch_norm_update_stats_cpu(
   return batch_norm_cpu_update_stats_template<Var>(self, running_mean, running_var, momentum, 0);
 }
 
-std::tuple<Tensor, Tensor, Tensor> batch_norm_cpu(const Tensor& self, const Tensor& weight, const Tensor& bias,
+std::tuple<Tensor, Tensor, Tensor> batch_norm_cpu(const Tensor& input, const Tensor& weight, const Tensor& bias,
                                                   const Tensor& running_mean, const Tensor& running_var,
                                                   bool train, double momentum, double eps) {
-  checkBackend("batch_norm_cpu", {self, weight, bias, running_mean, running_var}, Backend::CPU);
+  checkBackend("batch_norm_cpu", {input, weight, bias, running_mean, running_var}, Backend::CPU);
 
-  if (!train) {
-    return batch_norm_cpu_transform_input_template(self, weight, bias, {}, {}, running_mean, running_var, train, eps);
+  Tensor output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+
+  int64_t n_input = input.size(1);
+  auto scalar_shape = make_scalar_shape(input.dim(), n_input);
+
+  at::Tensor mean;
+  at::Tensor invstd;
+  at::Tensor save_mean;
+  at::Tensor save_invstd;
+
+  if (train) {
+    std::tie(save_mean, save_invstd) = batch_norm_cpu_update_stats_template<InvStd>(input, running_mean, running_var, momentum, eps);
+    mean = save_mean;
+    invstd = save_invstd;
   } else {
-    auto save_stats = batch_norm_cpu_update_stats_template<InvStd>(self, running_mean, running_var, momentum, eps);
-    return batch_norm_cpu_transform_input_template(self, weight, bias, std::get<0>(save_stats), std::get<1>(save_stats), running_mean, running_var, train, eps);
+    mean = running_mean;
+    invstd = 1 / at::sqrt(running_var + eps);
   }
+
+  output = input;
+  output = output - mean.reshape(IntArrayRef(scalar_shape));
+  output = output * invstd.reshape(IntArrayRef(scalar_shape));
+
+  if (weight.defined()) {
+    output = output * weight.reshape(IntArrayRef(scalar_shape));
+  }
+  if (bias.defined()) {
+    output = output + bias.reshape(IntArrayRef(scalar_shape));
+  }
+  return std::make_tuple(output, save_mean, save_invstd);
 }
 
 std::tuple<Tensor, Tensor, Tensor> batch_norm_backward_cpu(const Tensor& grad_out, const Tensor& self, const Tensor& weight,
