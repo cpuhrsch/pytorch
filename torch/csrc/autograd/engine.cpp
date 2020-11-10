@@ -595,18 +595,17 @@ void validate_outputs(
       continue;
     }
     if (metadata.is_nested_tensor()) {
-      std::cout << "metdata is nested tensor." << std::endl;
+      TORCH_CHECK(at::is_nested_tensor_impl(grad), "Unexpected 1.");
+      TORCH_CHECK(grad.dim() == metadata.shape().size(), "Unexpected 2.");
     }
     if (!metadata.is_nested_tensor() && !grad.sizes().equals(metadata.shape())) {
-      if (!at::is_expandable_to(metadata.shape(), grad.sizes())) {
+      if (!at::is_nested_tensor_impl(grad) && !at::is_expandable_to(metadata.shape(), grad.sizes())) {
         std::stringstream ss;
         ss << "invalid gradient at index " << i << " - got ";
         ss << grad.sizes() << " but expected shape compatible with ";
         ss << metadata.shape();
         AT_ERROR(format_error(ss.str()));
       }
-      std::cout << "at::is_nested_tensor_impl(grad): " << at::is_nested_tensor_impl(grad) << std::endl;
-      std::cout << "metadata.is_nested_tensor(): " << metadata.is_nested_tensor() << std::endl;
       grad = at::sum_to(std::move(grad), metadata.shape());
     }
 
