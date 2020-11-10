@@ -594,7 +594,7 @@ void validate_outputs(
       // AT_ERROR(format_error(ss.str()));
       continue;
     }
-    if (!grad.sizes().equals(metadata.shape())) {
+    if (!metadata.is_nested_tensor() && !grad.sizes().equals(metadata.shape())) {
       if (!at::is_expandable_to(metadata.shape(), grad.sizes())) {
         std::stringstream ss;
         ss << "invalid gradient at index " << i << " - got ";
@@ -602,6 +602,8 @@ void validate_outputs(
         ss << metadata.shape();
         AT_ERROR(format_error(ss.str()));
       }
+      std::cout << "at::is_nested_tensor_impl(grad): " << at::is_nested_tensor_impl(grad) << std::endl;
+      std::cout << "metadata.is_nested_tensor(): " << metadata.is_nested_tensor() << std::endl;
       grad = at::sum_to(std::move(grad), metadata.shape());
     }
 
