@@ -594,6 +594,9 @@ void validate_outputs(
       // AT_ERROR(format_error(ss.str()));
       continue;
     }
+    if (metadata.is_nested_tensor()) {
+      std::cout << "metdata is nested tensor." << std::endl;
+    }
     if (!metadata.is_nested_tensor() && !grad.sizes().equals(metadata.shape())) {
       if (!at::is_expandable_to(metadata.shape(), grad.sizes())) {
         std::stringstream ss;
