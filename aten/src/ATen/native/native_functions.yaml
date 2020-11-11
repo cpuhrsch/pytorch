@@ -3281,6 +3281,20 @@
 
 - func: sum_to(Tensor self, int[1] dim) -> Tensor
 
+- func: serialize_nested_size(Tensor self) -> Tensor
+
+# There are 4 scenarios we're trying to cover with sizes_equal and sizes_equal_nt_other
+# sizes_equal_nt_other -> Compare Tensor       vs. NestedTensor -> catchall lives in nestedtensor
+# sizes_equal_nt_other -> Compare NestedTensor vs. NestedTensor -> catchall lives in nestedtensor
+# sizes_equal          -> Compare       Tensor vs. Tensor       -> lives in ATen
+# sizes_equal          -> Compare NestedTensor vs. Tensor       -> lives in nestedtensor
+# This is used in autograd/engine.cpp and input_metadata doesn't store Tensors, so we use a catchall
+# to also support the Tensor vs. NestedTensor case.
+
+- func: sizes_equal_nt_other(Tensor size_self, int[1] size_other) -> bool
+
+- func: sizes_equal(Tensor size_self, int[1] size_other) -> bool
+
 - func: nansum(Tensor self, *, ScalarType? dtype=None) -> Tensor
   use_c10_dispatcher: full
   variants: function, method

@@ -594,20 +594,38 @@ void validate_outputs(
       // AT_ERROR(format_error(ss.str()));
       continue;
     }
+    std::cout << "at::is_nested_tensor_impl(grad): " << at::is_nested_tensor_impl(grad) << std::endl;
+      // std::cout << "at::serialize_nested_size(grad): " << at::serialize_nested_size(grad) << std::endl;
+    // if (metadata.is_nested_tensor()) {
+    //   TORCH_CHECK(at::is_nested_tensor_impl(grad), "Unexpected 1.");
+    //   TORCH_CHECK(grad.dim() == metadata.shape().size(), "Unexpected 2.");
+    // }
+// << "A00" << std::endl;
     if (metadata.is_nested_tensor()) {
-      TORCH_CHECK(at::is_nested_tensor_impl(grad), "Unexpected 1.");
-      TORCH_CHECK(grad.dim() == metadata.shape().size(), "Unexpected 2.");
-    }
-    if (!metadata.is_nested_tensor() && !grad.sizes().equals(metadata.shape())) {
-      if (!at::is_nested_tensor_impl(grad) && !at::is_expandable_to(metadata.shape(), grad.sizes())) {
-        std::stringstream ss;
-        ss << "invalid gradient at index " << i << " - got ";
-        ss << grad.sizes() << " but expected shape compatible with ";
-        ss << metadata.shape();
-        AT_ERROR(format_error(ss.str()));
+// << "A01" << std::endl;
+      if (!at::sizes_equal_nt_other(grad, metadata.nested_size())) {
+// << "A02" << std::endl;
+        grad = at::sum_to(std::move(grad), metadata.nested_size());
       }
-      grad = at::sum_to(std::move(grad), metadata.shape());
+// << "A03" << std::endl;
+    } else {
+// << "A04" << std::endl;
+      if (at::sizes_equal(grad, metadata.shape())) {
+// << "A05" << std::endl;
+        if (!at::is_expandable_to(metadata.shape(), grad.sizes())) {
+// << "A06" << std::endl;
+          std::stringstream ss;
+          ss << "invalid gradient at index " << i << " - got ";
+          ss << grad.sizes() << " but expected shape compatible with ";
+          ss << metadata.shape();
+          AT_ERROR(format_error(ss.str()));
+        }
+// << "A07" << std::endl;
+        grad = at::sum_to(std::move(grad), metadata.shape());
+      }
+// << "A08" << std::endl;
     }
+// << "A09" << std::endl;
 
     bool input_is_complex = isComplexType(c10::typeMetaToScalarType(metadata.options().dtype()));
     bool grad_is_complex = isComplexType(grad.scalar_type());

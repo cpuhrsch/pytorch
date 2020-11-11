@@ -1908,4 +1908,18 @@ Tensor movedim(const Tensor& self, int64_t src, int64_t dst) {
   return at::movedim(self, IntArrayRef{src}, IntArrayRef{dst});
 }
 
+Tensor serialize_nested_size(const Tensor& tensor) {
+  return at::empty({}, at::kLong);
+}
+
+bool sizes_equal(const Tensor& self, IntArrayRef size_other) {
+  std::cout << "SE0" << std::endl;
+  return self.sizes().equals(size_other);
+}
+
+bool sizes_equal_nt_other(const Tensor& self, IntArrayRef size_other) {
+  TORCH_CHECK(false, "Not implemented.");
+  return false;
+}
+
 }} // at::native
