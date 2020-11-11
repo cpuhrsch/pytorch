@@ -595,6 +595,9 @@ void validate_outputs(
       continue;
     }
     std::cout << "at::is_nested_tensor_impl(grad): " << at::is_nested_tensor_impl(grad) << std::endl;
+    std::cout << 
+      "metadata.is_nested_tensor(): " << 
+      metadata.is_nested_tensor() << std::endl;
       // std::cout << "at::serialize_nested_size(grad): " << at::serialize_nested_size(grad) << std::endl;
     // if (metadata.is_nested_tensor()) {
     //   TORCH_CHECK(at::is_nested_tensor_impl(grad), "Unexpected 1.");
@@ -602,14 +605,14 @@ void validate_outputs(
     // }
 // << "A00" << std::endl;
     if (metadata.is_nested_tensor()) {
-// << "A01" << std::endl;
+      std::cout << "A01" << std::endl;
       if (!at::sizes_equal_nt_other(grad, metadata.nested_size())) {
 // << "A02" << std::endl;
-        grad = at::sum_to(std::move(grad), metadata.nested_size());
+        grad = at::sum_to_nt(std::move(grad), metadata.nested_size());
       }
 // << "A03" << std::endl;
     } else {
-// << "A04" << std::endl;
+//      std::cout << "A04" << std::endl;
       if (at::sizes_equal(grad, metadata.shape())) {
 // << "A05" << std::endl;
         if (!at::is_expandable_to(metadata.shape(), grad.sizes())) {

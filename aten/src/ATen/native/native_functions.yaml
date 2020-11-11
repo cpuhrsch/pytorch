@@ -3279,7 +3279,9 @@
 
 - func: sum.DimnameList_out(Tensor self, Dimname[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 
-- func: sum_to(Tensor self, int[1] dim) -> Tensor
+- func: sum_to(Tensor self, int[1] shape) -> Tensor
+
+- func: sum_to_nt(Tensor self, int[1] nested_size) -> Tensor
 
 - func: serialize_nested_size(Tensor self) -> Tensor
 
