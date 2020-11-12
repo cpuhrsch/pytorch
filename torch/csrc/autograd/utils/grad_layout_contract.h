@@ -25,6 +25,7 @@ inline at::Tensor clone_obey_contract(const at::Tensor& new_grad, const at::Tens
     // (1)
     // Does this dicey-looking sequence attach the result to new_grad's
     // history if GradMode::is_enabled()?  Yes, and @alband says it should.
+    std::cout << "at::is_nested_tensor_impl(new_grad): " << at::is_nested_tensor_impl(new_grad) << std::endl;
     return std::move(at::empty_strided(variable.sizes(), variable.strides(),
                                        variable.options().memory_format(c10::nullopt))
                      .copy_(new_grad));
