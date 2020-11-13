@@ -641,7 +641,18 @@ Tensor expand(const Tensor& self, IntArrayRef size, bool implicit) {
   return result;
 }
 
+Tensor expand_nt(const Tensor& self, const Tensor& nested_size, bool implicit) {
+  TORCH_CHECK(false, "expand_nt NOT IMPLEMENTED.");
+  return self;
+}
+
 Tensor expand_as(const Tensor& self, const Tensor& other) {
+  // std::cout << "00 at::is_nested_tensor_impl(self): " << at::is_nested_tensor_impl(self) << std::endl;
+  // std::cout << "00 at::is_nested_tensor_impl(other): " << at::is_nested_tensor_impl(other) << std::endl;
+  // std::cout << "EA0101" << std::endl;
+  if (at::is_nested_tensor_impl(other)) {
+    return at::expand_nt(self, at::serialize_nested_size(other));
+  }
   return self.expand(other.sizes());
 }
 
@@ -1918,16 +1929,15 @@ bool sizes_equal_nt_other(const Tensor& self, IntArrayRef size_other) {
 }
 
 bool sizes_equal(const Tensor& self, IntArrayRef size_other) {
-  // std::cout << "SE0" << std::endl;
   return self.sizes().equals(size_other);
 }
 
-bool native_is_expandable_to_nt_other(const Tensor& grad, IntArrayRef metadata_nested_size) {
+bool native_is_expandable_to_nt_other(IntArrayRef metadata_nested_size, const Tensor& grad) {
   TORCH_CHECK(false, "Not implemented 1.");
   return false;
 }
 
-bool native_is_expandable_to(const Tensor& grad, IntArrayRef metadata_shape) {
+bool native_is_expandable_to(IntArrayRef metadata_shape, const Tensor& grad) {
   return at::is_expandable_to(metadata_shape, grad.sizes());
 }
 
