@@ -1,3 +1,4 @@
+#include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
 #include <ATen/Parallel.h>
 
@@ -25,7 +26,7 @@ void convert_coo_to_csr_cpu(
   for (int64_t i = 0; i < data_in[0]; i++)
     data_out[i] = (output_t)0;
 
-  at::parallel_for(0, numel - 1, GRAIN_SIZE, [&](int64_t start, int64_t end) {
+  at::parallel_for(0, numel_in - 1, GRAIN_SIZE, [&](int64_t start, int64_t end) {
     input_t curr_value = data_in[start], next_value;
     for (int64_t i = start; i < end; i++) {
       next_value = data_in[i + 1];
@@ -34,8 +35,8 @@ void convert_coo_to_csr_cpu(
     }
   });
 
-  for (int64_t i = data_in[numel - 1] + 1; i < size + 1; i++)
-    data_out[i] = (output_t)numel;
+  for (int64_t i = data_in[numel_in - 1] + 1; i < size + 1; i++)
+    data_out[i] = (output_t)numel_in;
 }
 
 void dispatch(
