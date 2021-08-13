@@ -5105,11 +5105,6 @@ def multi_head_attention_forward(
     else:
         return attn_output, None
 
-from typing import Optional, Tuple
-
-import torch
-
-from .utils import broadcast
 
 def scatter_reduce_broadcast(src: torch.Tensor, other: torch.Tensor, dim: int):
     if dim < 0:

@@ -1756,4 +1756,246 @@ Tensor & masked_scatter__cpu(Tensor& self, const Tensor & mask, const Tensor & s
   return self;
 }
 
+#include "scatter_cpu.h"
+
+#include "index_info.h"
+#include "reducer.h"
+#include "utils.h"
+
+#include <limits>
+#include <map>
+
+#pragma once
+
+#include <torch/extension.h>
+
+#define MAX_TENSORINFO_DIMS 25
+
+#pragma once
+
+#include <torch/extension.h>
+
+#define CHECK_CPU(x) AT_ASSERTM(x.device().is_cpu(), #x " must be CPU tensor")
+#define CHECK_INPUT(x) AT_ASSERTM(x, "Input mismatch")
+
+template <typename scalar_t> struct TensorInfo {
+  TensorInfo(scalar_t *p, int dim, int sz[MAX_TENSORINFO_DIMS],
+             int st[MAX_TENSORINFO_DIMS]) {
+    data = p;
+    dims = dim;
+    AT_ASSERT(dims < MAX_TENSORINFO_DIMS);
+
+    for (int i = 0; i < dim; ++i) {
+      sizes[i] = sz[i];
+      strides[i] = st[i];
+    }
+  }
+
+  scalar_t *data;
+  int dims;
+  int sizes[MAX_TENSORINFO_DIMS];
+  int strides[MAX_TENSORINFO_DIMS];
+};
+
+template <typename scalar_t>
+TensorInfo<scalar_t> getTensorInfo(const torch::Tensor &tensor) {
+  int sizes[MAX_TENSORINFO_DIMS];
+  int strides[MAX_TENSORINFO_DIMS];
+
+  int dims = tensor.dim();
+  for (int i = 0; i < dims; ++i) {
+    sizes[i] = tensor.size(i);
+    strides[i] = tensor.stride(i);
+  }
+
+  return TensorInfo<scalar_t>(tensor.data_ptr<scalar_t>(), dims, sizes,
+                              strides);
+}
+
+template <typename scalar_t> struct IndexToOffset {
+  static inline int get(int idx, const TensorInfo<scalar_t> &info) {
+    int offset = 0;
+    for (int i = info.dims - 1; i >= 0; --i) {
+      offset += (idx % info.sizes[i]) * info.strides[i];
+      idx /= info.sizes[i];
+    }
+    return offset;
+  }
+};
+
+template <typename scalar_t> struct IndexPtrToOffset {
+  static inline int get(int idx, const TensorInfo<scalar_t> &info) {
+    int offset = idx % (info.sizes[info.dims - 1] - 1);
+    offset *= info.strides[info.dims - 1];
+    idx /= info.sizes[info.dims - 1] - 1;
+    for (int i = info.dims - 2; i >= 0; --i) {
+      offset += (idx % info.sizes[i]) * info.strides[i];
+      idx /= info.sizes[i];
+    }
+    return offset;
+  }
+};
+
+enum ReductionType { SUM, MEAN, MUL, DIV, MIN, MAX };
+
+const std::map<std::string, ReductionType> reduce2REDUCE = {
+    {"sum", SUM}, {"mean", MEAN}, {"mul", MUL},
+    {"div", DIV}, {"min", MIN},   {"max", MAX},
+};
+
+#define AT_DISPATCH_REDUCTION_TYPES(reduce, ...)                               \
+  [&] {                                                                        \
+    switch (reduce2REDUCE.at(reduce)) {                                        \
+    case SUM: {                                                                \
+      static constexpr ReductionType REDUCE = SUM;                             \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case MEAN: {                                                               \
+      static constexpr ReductionType REDUCE = MEAN;                            \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case MUL: {                                                                \
+      static constexpr ReductionType REDUCE = MUL;                             \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case DIV: {                                                                \
+      static constexpr ReductionType REDUCE = DIV;                             \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case MIN: {                                                                \
+      static constexpr ReductionType REDUCE = MIN;                             \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    case MAX: {                                                                \
+      static constexpr ReductionType REDUCE = MAX;                             \
+      return __VA_ARGS__();                                                    \
+    }                                                                          \
+    }                                                                          \
+  }()
+
+template <typename scalar_t, ReductionType REDUCE> struct Reducer {
+  static inline scalar_t init() {
+    if (REDUCE == MUL || REDUCE == DIV)
+      return (scalar_t)1;
+    else if (REDUCE == MIN)
+      return std::numeric_limits<scalar_t>::max();
+    else if (REDUCE == MAX)
+      return std::numeric_limits<scalar_t>::lowest();
+    else
+      return (scalar_t)0;
+  }
+
+  static inline void update(scalar_t *val, scalar_t new_val, int64_t *arg,
+                            int64_t new_arg) {
+    if (REDUCE == SUM || REDUCE == MEAN)
+      *val = *val + new_val;
+    else if (REDUCE == MUL)
+      *val = *val * new_val;
+    else if (REDUCE == DIV)
+      *val = *val / new_val;
+    else if ((REDUCE == MIN && new_val < *val) ||
+             (REDUCE == MAX && new_val > *val)) {
+      *val = new_val;
+      *arg = new_arg;
+    }
+  }
+
+  static inline void write(scalar_t *address, scalar_t val,
+                           int64_t *arg_address, int64_t arg, int count) {
+    if (REDUCE == SUM || REDUCE == MUL || REDUCE == DIV)
+      *address = val;
+    else if (REDUCE == MEAN)
+      *address = val / (scalar_t)(count > 0 ? count : 1);
+    else if (REDUCE == MIN || REDUCE == MAX) {
+      if (count > 0) {
+        *address = val;
+        *arg_address = arg;
+      } else
+        *address = (scalar_t)0;
+    }
+  }
+};
+
+std::tuple<torch::Tensor, torch::optional<torch::Tensor>>
+scatter_cpu(torch::Tensor src, torch::Tensor index, int64_t dim,
+            torch::optional<torch::Tensor> optional_out,
+            torch::optional<int64_t> dim_size, std::string reduce) {
+  CHECK_CPU(src);
+  CHECK_CPU(index);
+  if (optional_out.has_value())
+    CHECK_CPU(optional_out.value());
+
+  CHECK_INPUT(src.dim() == index.dim());
+  for (auto i = 0; i < index.dim() - 1; i++)
+    CHECK_INPUT(src.size(i) >= index.size(i));
+
+  src = src.contiguous();
+
+  torch::Tensor out;
+  if (optional_out.has_value()) {
+    out = optional_out.value().contiguous();
+    for (auto i = 0; i < out.dim(); i++)
+      if (i != dim)
+        CHECK_INPUT(src.size(i) == out.size(i));
+  } else {
+    auto sizes = src.sizes().vec();
+    if (dim_size.has_value())
+      sizes[dim] = dim_size.value();
+    else if (index.numel() == 0)
+      sizes[dim] = 0;
+    else
+      sizes[dim] = 1 + *index.max().data_ptr<int64_t>();
+    out = torch::empty(sizes, src.options());
+  }
+
+  torch::optional<torch::Tensor> arg_out = torch::nullopt;
+  int64_t *arg_out_data = nullptr;
+  if (reduce2REDUCE.at(reduce) == MIN || reduce2REDUCE.at(reduce) == MAX) {
+    arg_out = torch::full_like(out, src.size(dim), index.options());
+    arg_out_data = arg_out.value().data_ptr<int64_t>();
+  }
+
+  if (src.numel() == 0) {
+    if (!optional_out.has_value())
+      out.fill_(0);
+    return std::make_tuple(out, arg_out);
+  }
+
+  auto B = 1;
+  for (auto i = 0; i < dim; i++)
+    B *= src.size(i);
+  auto E = src.size(dim);
+  auto K = src.numel() / (B * E);
+  auto N = out.size(dim);
+
+  auto index_info = getTensorInfo<int64_t>(index);
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, src.scalar_type(), "_", [&] {
+    auto src_data = src.data_ptr<scalar_t>();
+    auto out_data = out.data_ptr<scalar_t>();
+
+    int64_t i, idx;
+    AT_DISPATCH_REDUCTION_TYPES(reduce, [&] {
+      if (!optional_out.has_value())
+        out.fill_(Reducer<scalar_t, REDUCE>::init());
+
+      for (auto b = 0; b < B; b++) {
+        for (auto e = 0; e < E; e++) {
+          for (auto k = 0; k < K; k++) {
+            i = b * E * K + e * K + k;
+            idx = index_info.data[IndexToOffset<int64_t>::get(i, index_info)];
+            Reducer<scalar_t, REDUCE>::update(
+                out_data + b * N * K + idx * K + k, src_data[i],
+                arg_out_data + b * N * K + idx * K + k, e);
+          }
+        }
+      }
+
+      if (!optional_out.has_value() && (REDUCE == MIN || REDUCE == MAX))
+        out.masked_fill_(out == Reducer<scalar_t, REDUCE>::init(), (scalar_t)0);
+    });
+  });
+
+  return std::make_tuple(out, arg_out);
+}
+
 }} // at::native
