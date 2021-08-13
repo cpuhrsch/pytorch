@@ -5740,6 +5740,10 @@
 - func: scatter_add.dimname(Tensor self, Dimname dim, Tensor index, Tensor src) -> Tensor
   variants: function, method
 
+- func: scatter_reduce(Tensor src, Tensor index, int dim, str reduce) -> Tensor
+  dispatch:
+    CPU: scatter_reduce_cpu
+
 - func: eq_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
   structured_delegate: eq.Scalar_out
   device_check: NoCheck   # TensorIterator

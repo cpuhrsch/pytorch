@@ -8364,7 +8364,7 @@ class TestTorch(AbstractTestCases._TestTorchMixin):
     
     @pytest.mark.parametrize('test,reduce,dtype,device',
                              product(tests, reductions, dtypes, devices))
-    def test_forward(test, reduce, dtype, device):
+    def test_scatter_reduce_forward(test, reduce, dtype, device):
         src = tensor(test['src'], dtype, device)
         index = tensor(test['index'], torch.long, device)
         dim = test['dim']
@@ -8382,67 +8382,6 @@ class TestTorch(AbstractTestCases._TestTorchMixin):
             assert arg_out1.tolist() == arg_out1.tolist()
         assert torch.all(out1 == expected)
         assert out1.tolist() == out2.tolist()
-    
-    
-    @pytest.mark.parametrize('test,reduce,device',
-                             product(tests, reductions, devices))
-    def test_backward(test, reduce, device):
-        src = tensor(test['src'], torch.double, device)
-        src.requires_grad_()
-        index = tensor(test['index'], torch.long, device)
-        dim = test['dim']
-    
-        assert gradcheck(torch_scatter.scatter,
-                         (src, index, dim, None, None, reduce))
-    
-    
-    @pytest.mark.parametrize('test,reduce,dtype,device',
-                             product(tests, reductions, dtypes, devices))
-    def test_out(test, reduce, dtype, device):
-        src = tensor(test['src'], dtype, device)
-        index = tensor(test['index'], torch.long, device)
-        dim = test['dim']
-        expected = tensor(test[reduce], dtype, device)
-    
-        out = torch.full_like(expected, -2)
-    
-        getattr(torch_scatter, 'scatter_' + reduce)(src, index, dim, out)
-    
-        if reduce == 'sum' or reduce == 'add':
-            expected = expected - 2
-        elif reduce == 'mul':
-            expected = out  # We can not really test this here.
-        elif reduce == 'mean':
-            expected = out  # We can not really test this here.
-        elif reduce == 'min':
-            expected = expected.fill_(-2)
-        elif reduce == 'max':
-            expected[expected == 0] = -2
-        else:
-            raise ValueError
-    
-        assert torch.all(out == expected)
-    
-    
-    @pytest.mark.parametrize('test,reduce,dtype,device',
-                             product(tests, reductions, dtypes, devices))
-    def test_non_contiguous(test, reduce, dtype, device):
-        src = tensor(test['src'], dtype, device)
-        index = tensor(test['index'], torch.long, device)
-        dim = test['dim']
-        expected = tensor(test[reduce], dtype, device)
-    
-        if src.dim() > 1:
-            src = src.transpose(0, 1).contiguous().transpose(0, 1)
-        if index.dim() > 1:
-            index = index.transpose(0, 1).contiguous().transpose(0, 1)
-    
-        out = getattr(torch_scatter, 'scatter_' + reduce)(src, index, dim)
-        if isinstance(out, tuple):
-            out, arg_out = out
-            arg_expected = tensor(test['arg_' + reduce], torch.long, device)
-            assert torch.all(arg_out == arg_expected)
-        assert torch.all(out == expected)
 
 
 # TODO: these empy classes are temporarily instantiated for XLA compatibility

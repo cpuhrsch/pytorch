@@ -69,6 +69,9 @@
 #include <functional>
 #include <numeric>
 #include <vector>
+#include <limits>
+#include <map>
+
 
 namespace at {
 namespace meta {
@@ -1756,27 +1759,7 @@ Tensor & masked_scatter__cpu(Tensor& self, const Tensor & mask, const Tensor & s
   return self;
 }
 
-#include "scatter_cpu.h"
-
-#include "index_info.h"
-#include "reducer.h"
-#include "utils.h"
-
-#include <limits>
-#include <map>
-
-#pragma once
-
-#include <torch/extension.h>
-
 #define MAX_TENSORINFO_DIMS 25
-
-#pragma once
-
-#include <torch/extension.h>
-
-#define CHECK_CPU(x) AT_ASSERTM(x.device().is_cpu(), #x " must be CPU tensor")
-#define CHECK_INPUT(x) AT_ASSERTM(x, "Input mismatch")
 
 template <typename scalar_t> struct TensorInfo {
   TensorInfo(scalar_t *p, int dim, int sz[MAX_TENSORINFO_DIMS],
@@ -1917,26 +1900,15 @@ template <typename scalar_t, ReductionType REDUCE> struct Reducer {
 };
 
 std::tuple<torch::Tensor, torch::optional<torch::Tensor>>
-scatter_cpu(torch::Tensor src, torch::Tensor index, int64_t dim,
+scatter_reduce_cpu(torch::Tensor src, torch::Tensor index, int64_t dim,
             torch::optional<torch::Tensor> optional_out,
             torch::optional<int64_t> dim_size, std::string reduce) {
-  CHECK_CPU(src);
-  CHECK_CPU(index);
-  if (optional_out.has_value())
-    CHECK_CPU(optional_out.value());
-
-  CHECK_INPUT(src.dim() == index.dim());
-  for (auto i = 0; i < index.dim() - 1; i++)
-    CHECK_INPUT(src.size(i) >= index.size(i));
 
   src = src.contiguous();
 
   torch::Tensor out;
   if (optional_out.has_value()) {
     out = optional_out.value().contiguous();
-    for (auto i = 0; i < out.dim(); i++)
-      if (i != dim)
-        CHECK_INPUT(src.size(i) == out.size(i));
   } else {
     auto sizes = src.sizes().vec();
     if (dim_size.has_value())
