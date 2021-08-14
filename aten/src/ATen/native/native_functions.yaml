@@ -5740,7 +5740,7 @@
 - func: scatter_add.dimname(Tensor self, Dimname dim, Tensor index, Tensor src) -> Tensor
   variants: function, method
 
-- func: scatter_reduce(Tensor src, Tensor index, int dim, str reduce) -> Tensor
+- func: scatter_reduce_op(Tensor src, Tensor index, int dim, str reduce) -> Tensor
   dispatch:
     CPU: scatter_reduce_cpu
 
