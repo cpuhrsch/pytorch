@@ -110,6 +110,37 @@ bool to_will_alias(
     (memory_format == MemoryFormat::Preserve ||
      self.suggest_memory_format() == memory_format);
 }
+
+
+static inline Tensor _to_impl_sparse(
+    const Tensor& self,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout_,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory,
+    bool non_blocking,
+    bool copy,
+    c10::optional<c10::MemoryFormat> optional_memory_format) {
+  TORCH_CHECK(
+      !optional_memory_format.has_value(),
+      "unsupported memory format option ",
+      optional_memory_format.value());
+  Tensor input_crow_indices = self.crow_indices();
+  Tensor input_col_indices = self.col_indices();
+  auto layout = c10::Layout::Strided;
+
+  Tensor result_values = at::native::to(self.values(), dtype, layout, device, pin_memory, non_blocking, copy, optional_memory_format);
+  Tensor result_crow_indices = at::native::to(input_crow_indices, input_crow_indices.scalar_type(), layout, device, pin_memory, non_blocking, copy, optional_memory_format);
+  Tensor result_col_indices =  at::native::to(input_col_indices, input_col_indices.scalar_type(), layout, device, pin_memory, non_blocking, copy, optional_memory_format);
+  return at::native::_sparse_csr_tensor_unsafe(
+      result_crow_indices,
+      result_col_indices,
+      result_values,
+      self.sizes(),
+      result_values.scalar_type(),
+      self.layout(),
+      result_values.device());
+}
 
 static inline Tensor to_impl(
     const Tensor& self,
@@ -120,6 +151,9 @@ static inline Tensor to_impl(
     bool non_blocking,
     bool copy,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
+  if (self.is_sparse() || self.is_sparse_csr()) {
+    return _to_impl_sparse(self, dtype, layout, device, pin_memory, non_blocking, copy, optional_memory_format);
+  }
 
   // fast path
   if (to_will_alias(self, dtype, layout, device, copy, optional_memory_format)) {
