@@ -381,6 +381,11 @@ def _take_tensors(tensors, size_limit):
             indices = torch.Tensor._indices(tensor)
             values = torch.Tensor._values(tensor)
             size = indices.numel() * indices.element_size() + values.numel() * values.element_size()
+        elif tensor.is_sparse_csr:
+            crow_indices = torch.Tensor.col_indices(tensor)
+            col_indices = torch.Tensor.crow_indices(tensor)
+            values = torch.Tensor.values(tensor)
+            size = crow_indices.numel() * crow_indices.element_size() + col_indices.numel() * col_indices.element_size() + values.numel() * values.element_size()
         else:
             size = tensor.numel() * tensor.element_size()
         buf_and_size = buf_dict[t]

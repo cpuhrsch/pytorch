@@ -92,7 +92,7 @@ class Tensor(torch._C._TensorBase):
             # does accurate alias tracking; however, the code below
             # doesn't work because of
             # https://github.com/pytorch/pytorch/issues/47442
-            if self.is_sparse or self.device.type in ['xla', 'mlc', 'ort', 'meta', 'hpu']:
+            if self.is_sparse or self.is_sparse_csr or self.device.type in ['xla', 'mlc', 'ort', 'meta', 'hpu']:
                 new_tensor = self.clone()
             else:
                 new_storage = self.storage().__deepcopy__(memo)
@@ -717,7 +717,7 @@ class Tensor(torch._C._TensorBase):
         keys = tensor_methods + attrs
 
         # property only available dense, cuda tensors
-        if (not self.is_cuda) or self.is_sparse:
+        if (not self.is_cuda) or self.is_sparse or self.is_sparse_csr:
             keys.remove("__cuda_array_interface__")
 
         return sorted(keys)
@@ -781,7 +781,7 @@ class Tensor(torch._C._TensorBase):
                 self.type()
             )
 
-        if self.is_sparse:
+        if self.is_sparse or self.is_sparse_csr:
             raise AttributeError(
                 "Can't get __cuda_array_interface__ on sparse type: %s "
                 "Use Tensor.to_dense() to convert to a dense tensor first." %
