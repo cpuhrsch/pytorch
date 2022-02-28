@@ -1,9 +1,10 @@
-.. currentmodule:: torch
-
-.. _nested-docs:
-
 torch.nested
 ============
+
+.. automodule:: torch.nested
+
+Introduction
+++++++++++++
 
 .. warning::
 
@@ -13,9 +14,6 @@ torch.nested
 
   torch.NestedTensor currently does not support autograd. It needs to be used in the context
   of torch.inference_mode().
-
-Introduction
-++++++++++++
 
 NestedTensor allows the user to pack a list of Tensors into a single, efficient datastructure.
 
