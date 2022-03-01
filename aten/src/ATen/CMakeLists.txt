@@ -79,8 +79,8 @@ file(GLOB miopen_cpp "miopen/*.cpp")
 file(GLOB mkl_cpp "mkl/*.cpp")
 file(GLOB mkldnn_cpp "mkldnn/*.cpp")
 
-file(GLOB nestedtensor_h "native/nestedtensor/*.h")
-file(GLOB nestedtensor_cpp "native/nestedtensor/*.cpp")
+file(GLOB native_nested_h "native/nested/*.h")
+file(GLOB native_nested_cpp "native/nested/*.cpp")
 
 file(GLOB native_cpp "native/*.cpp")
 file(GLOB native_mkl_cpp "native/mkl/*.cpp")
@@ -177,7 +177,7 @@ else()
   set(all_cpu_cpp ${all_cpu_cpp} ${vulkan_cpp})
 endif()
 
-set(all_cpu_cpp ${all_cpu_cpp} ${nestedtensor_cpp})
+set(all_cpu_cpp ${all_cpu_cpp} ${native_nested_cpp})
 
 # Metal
 if(USE_PYTORCH_METAL_EXPORT)
@@ -212,7 +212,7 @@ if(USE_CUDA)
     ${native_quantized_cuda_cpp}
     ${native_quantized_cudnn_cpp}
     ${native_sparse_cuda_cpp}
-    ${nestedtensor_cpp}
+    ${native_nested_cpp}
   )
   if(CAFFE2_USE_CUDNN)
     list(APPEND ATen_CUDA_CPP_SRCS ${cudnn_cpp})
@@ -478,7 +478,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake-exports/ATenConfig.cmake"
 
 set(INSTALL_HEADERS ${base_h} ${ATen_CORE_HEADERS})
 if(NOT INTERN_BUILD_MOBILE)
-  list(APPEND INSTALL_HEADERS ${native_h} ${native_cpu_h} ${native_ao_sparse_h} ${native_quantized_h} ${cuda_h} ${native_cuda_h} ${native_hip_h} ${cudnn_h} ${hip_h} ${miopen_h} ${nestedtensor_h})
+  list(APPEND INSTALL_HEADERS ${native_h} ${native_cpu_h} ${native_ao_sparse_h} ${native_quantized_h} ${cuda_h} ${native_cuda_h} ${native_hip_h} ${cudnn_h} ${hip_h} ${miopen_h} ${native_nested_h})
   # Metal
   if(USE_PYTORCH_METAL_EXPORT)
     # Add files needed from exporting metal models(optimized_for_mobile)
