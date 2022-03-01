@@ -79,9 +79,6 @@ file(GLOB miopen_cpp "miopen/*.cpp")
 file(GLOB mkl_cpp "mkl/*.cpp")
 file(GLOB mkldnn_cpp "mkldnn/*.cpp")
 
-file(GLOB native_nested_h "native/nested/*.h")
-file(GLOB native_nested_cpp "native/nested/*.cpp")
-
 file(GLOB native_cpp "native/*.cpp")
 file(GLOB native_mkl_cpp "native/mkl/*.cpp")
 file(GLOB native_mkldnn_cpp "native/mkldnn/*.cpp")
@@ -107,6 +104,7 @@ file(GLOB native_sparse_cpp "native/sparse/*.cpp")
 file(GLOB native_quantized_cpp
             "native/quantized/*.cpp"
             "native/quantized/cpu/*.cpp")
+file(GLOB native_nested_cpp "native/nested/*.cpp")
 
 file(GLOB native_h "native/*.h")
 file(GLOB native_ao_sparse_h
@@ -158,7 +156,7 @@ if(BUILD_LITE_INTERPRETER)
 else()
   set(
     all_cpu_cpp ${base_cpp} ${ATen_CORE_SRCS} ${native_cpp}
-    ${native_ao_sparse_cpp} ${native_sparse_cpp}
+    ${native_ao_sparse_cpp} ${native_sparse_cpp} ${native_nested_cpp}
     ${native_quantized_cpp} ${native_mkl_cpp} ${native_mkldnn_cpp}
     ${native_utils_cpp} ${native_xnnpack} ${generated_sources} ${core_generated_sources}
     ${ATen_CPU_SRCS} ${ATen_QUANTIZED_SRCS} ${ATen_NNAPI_SRCS} ${cpu_kernel_cpp}
@@ -176,8 +174,6 @@ if(USE_VULKAN)
 else()
   set(all_cpu_cpp ${all_cpu_cpp} ${vulkan_cpp})
 endif()
-
-set(all_cpu_cpp ${all_cpu_cpp} ${native_nested_cpp})
 
 # Metal
 if(USE_PYTORCH_METAL_EXPORT)
@@ -212,7 +208,6 @@ if(USE_CUDA)
     ${native_quantized_cuda_cpp}
     ${native_quantized_cudnn_cpp}
     ${native_sparse_cuda_cpp}
-    ${native_nested_cpp}
   )
   if(CAFFE2_USE_CUDNN)
     list(APPEND ATen_CUDA_CPP_SRCS ${cudnn_cpp})

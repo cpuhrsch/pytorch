@@ -1,5 +1,8 @@
 #pragma once
-#include <ATen/ATen.h>
+#include <ATen/Tensor.h>
+#include <c10/core/TensorImpl.h>
+#include <c10/util/Exception.h>
+#include <c10/util/irange.h>
 #include <ATen/MemoryOverlap.h>
 #include <c10/core/MemoryFormat.h>
 #include <c10/util/Metaprogramming.h>
