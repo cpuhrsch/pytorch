@@ -348,6 +348,8 @@ void addmm_out_sparse_csr(
     return addmm_sparse_input_dense_result(mat1, mat2, beta, alpha, result);
   } else if (mat2.is_sparse_csr() && result.is_sparse_csr()) {
     return addmm_sparse_result(mat1, mat2, beta, alpha, result);
+  } else if (mat1.is_sparse_csr() && !mat2.is_sparse_csr() && result.is_sparse_csr()) {
+    return addmm_sparse_result(mat1, mat2, beta, alpha, result);
   } else {
     TORCH_CHECK(false, "addmm: computation on CPU is not implemented for ",
                 result.layout(), " + ", mat1.layout(), " @ ", mat2.layout());

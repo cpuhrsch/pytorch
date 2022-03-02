@@ -392,6 +392,11 @@ Tensor& addmm_out_sparse_csr_cpu(
     const Scalar& beta,
     const Scalar& alpha,
     Tensor& result) {
+  if (!mat1.is_sparse_csr() && mat2.is_sparse_csr()) {
+    addmm_out_sparse_csr_cpu(self, mat2.transpose(0, 1), mat1.transpose(0, 1), beta, alpha, result);
+    result = result.transpose(0, 1);
+    return result;
+  }
   TORCH_INTERNAL_ASSERT(mat1.is_sparse_csr());
 
   // TODO: remove this, there are no codegenerated checks for devices yet
