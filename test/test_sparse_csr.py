@@ -521,6 +521,7 @@ class TestSparseCSR(TestCase):
         sparse1 = dense1.to_sparse_csr()
 
         sparse1.backward(sparse0)
+        print("dense1.grad: ", dense1.grad)
 
         self.assertEqual(torch.tensor([0, 2, 2, 3], dtype=torch.int64), sparse1.crow_indices())
         self.assertEqual(torch.tensor([0, 1, 0], dtype=torch.int64), sparse1.col_indices())
