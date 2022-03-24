@@ -512,26 +512,20 @@ class TestSparseCSR(TestCase):
         self.assertEqual(torch.tensor([0, 1, 2] * 3, dtype=torch.int64), sparse.col_indices())
         self.assertEqual(torch.tensor([2] * 9, dtype=dtype), sparse.values())
 
-    @dtypes(*get_all_dtypes())
-    def test_sparse_csr_from_dense_autograd(self, device, dtype):
-        print("SJKDLF")
-        dense = torch.tensor([[4, 5, 0], [0, 0, 0], [1, 0, 0]], dtype=dtype, device=device)
-        sparse = dense.to_sparse_csr()
-        self.assertEqual(torch.tensor([0, 2, 2, 3], dtype=torch.int64), sparse.crow_indices())
-        self.assertEqual(torch.tensor([0, 1, 0], dtype=torch.int64), sparse.col_indices())
-        self.assertEqual(torch.tensor([4, 5, 1], dtype=dtype), sparse.values())
+    def test_sparse_csr_from_dense_autograd(self, device):
+        dtype = torch.float32
+        dense0 = torch.tensor([[4, 5, 0], [0, 0, 0], [1, 0, 0]], dtype=dtype, device=device)
+        sparse0 = dense0.to_sparse_csr()
 
-        dense = torch.tensor([[0, 0, 0], [0, 0, 1], [1, 0, 0]], dtype=dtype, device=device)
-        sparse = dense.to_sparse_csr()
-        self.assertEqual(torch.tensor([0, 0, 1, 2], dtype=torch.int64), sparse.crow_indices())
-        self.assertEqual(torch.tensor([2, 0], dtype=torch.int64), sparse.col_indices())
-        self.assertEqual(torch.tensor([1, 1], dtype=dtype), sparse.values())
+        dense1 = dense0.clone().requires_grad_(True)
+        sparse1 = dense1.to_sparse_csr()
 
-        dense = torch.tensor([[2, 2, 2], [2, 2, 2], [2, 2, 2]], dtype=dtype, device=device)
-        sparse = dense.to_sparse_csr()
-        self.assertEqual(torch.tensor([0, 3, 6, 9], dtype=torch.int64), sparse.crow_indices())
-        self.assertEqual(torch.tensor([0, 1, 2] * 3, dtype=torch.int64), sparse.col_indices())
-        self.assertEqual(torch.tensor([2] * 9, dtype=dtype), sparse.values())
+        sparse1.backward(sparse0)
+
+        self.assertEqual(torch.tensor([0, 2, 2, 3], dtype=torch.int64), sparse1.crow_indices())
+        self.assertEqual(torch.tensor([0, 1, 0], dtype=torch.int64), sparse1.col_indices())
+        self.assertEqual(torch.tensor([4, 5, 1], dtype=dtype), sparse1.values())
+
 
     @dtypes(*get_all_dtypes())
     def test_sparse_csr_to_dense(self, device, dtype):
