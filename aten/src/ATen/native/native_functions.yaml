@@ -3203,12 +3203,14 @@
   variants: function, method
   dispatch:
     CompositeExplicitAutograd: mul
+    SparseCsrCPU, SparseCsrCUDA: mul_scalar_sparse_csr
 
 - func: mul_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
   device_check: NoCheck   # TensorIterator
   variants: method
   dispatch:
     CompositeExplicitAutograd: mul_
+    SparseCsrCPU, SparseCsrCUDA: mul__scalar_sparse_csr
 
 # multiply, alias for mul
 - func: multiply.Tensor(Tensor self, Tensor other) -> Tensor
