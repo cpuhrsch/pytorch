@@ -851,8 +851,12 @@ Tensor _csr_to_block_csr_cpu(const Tensor& self, IntArrayRef blocksize) {
   // Next we copy over non-zero elements into the allocated blocks.
   AT_DISPATCH_INDEX_TYPES(
       input_crow_indices.scalar_type(), "_csr_to_block_csr_cpu", [&] {
-        AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-            input_values.scalar_type(), "_csr_to_block_csr_cpu", [&] {
+        AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+            at::ScalarType::Half,
+            at::ScalarType::Bool,
+            input_values.scalar_type(),
+            "_csr_to_block_csr_cpu",
+            [&] {
               _csr_to_block_csr_cpu_kernel<index_t, scalar_t>(
                   n_row,
                   n_col,
