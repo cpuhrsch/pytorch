@@ -352,6 +352,23 @@ Tensor sparse_to_dense(const Tensor& self, c10::optional<ScalarType> dtype) {
   return dst.add_(self);
 }
 
+Tensor _block_sparse_to_dense(IntArrayRef self_sizes, Tensor indices, Tensor values) {
+  int64_t blocksize[2] = {values.size(-2), values.size(-1)};
+  DimVector expanded_size(
+      {self_sizes[0] / blocksize[0],
+       self_sizes[1] / blocksize[1],
+       blocksize[0],
+       blocksize[1]});
+  // We make use of COO dense dimensions here to use the COO to dense format
+  // conversion.
+  auto self_coo =
+      at::native::_sparse_coo_tensor_unsafe(indices, values, expanded_size)
+          .coalesce();
+  // Here we are untiling the result.
+  return self_coo.to_dense().transpose(1, 2).reshape(
+      {self_sizes[0], self_sizes[1]});
+}
+
 Tensor sparse_compressed_to_dense(
     const Tensor& self,
     c10::optional<ScalarType> dtype) {
@@ -362,27 +379,17 @@ Tensor sparse_compressed_to_dense(
     Tensor dst = at::zeros(self.sizes(), self.options().layout(kStrided));
     return dst.add_(self);
   }
+  if (self.layout() == kSparseBsc) {
+    TORCH_CHECK(self.dim() == 2, "Can only convert 2D SparseBsc to Strided.");
+  }
   if (self.layout() == kSparseBsr) {
     TORCH_CHECK(self.dim() == 2, "Can only convert 2D SparseBsr to Strided.");
+    auto crow_indices = self.crow_indices();
+    auto col_indices = self.col_indices();
+    const bool out_int32 = crow_indices.scalar_type() == ScalarType::Int;
     Tensor indices = at::_convert_indices_from_csr_to_coo(
-        self.crow_indices(), self.col_indices(), false, false);
-    auto values = self.values();
-    int64_t blocksize[2] = {values.size(-2), values.size(-1)};
-    DimVector expanded_size(
-        {self.size(0) / blocksize[0],
-         self.size(1) / blocksize[1],
-         blocksize[0],
-         blocksize[1]});
-    // We make use of COO dense dimensions here to use the COO to dense format
-    // conversion.
-    auto self_coo =
-        at::native::_sparse_coo_tensor_unsafe(indices, values, expanded_size)
-            .coalesce();
-    auto dense = self_coo.to_dense();
-    // Here we are untiling the result.
-    dense = dense.transpose(1, 2);
-    dense = dense.reshape({self.size(0), self.size(1)});
-    return dense;
+        crow_indices, col_indices, out_int32, false);
+    return _block_sparse_to_dense(self.sizes(), indices, self.values());
   }
   return self.to_sparse().to_dense();
 }
