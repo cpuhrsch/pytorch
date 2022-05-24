@@ -2162,9 +2162,6 @@ class TestSparseCSR(TestCase):
 
         TODO: Eventually this is meant to be merged into test_compressed_layout_conversions_coverage
         """
-        if layout is torch.sparse_bsc:
-            # TODO: Remove this once support has been enabled
-            return
 
         shapes = [(6, 10), (0, 10), (6, 0), (0, 0)]
 

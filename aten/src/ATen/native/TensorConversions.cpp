@@ -381,6 +381,12 @@ Tensor sparse_compressed_to_dense(
   }
   if (self.layout() == kSparseBsc) {
     TORCH_CHECK(self.dim() == 2, "Can only convert 2D SparseBsc to Strided.");
+    auto ccol_indices = self.ccol_indices();
+    auto row_indices = self.row_indices();
+    const bool out_int32 = ccol_indices.scalar_type() == ScalarType::Int;
+    Tensor indices = at::_convert_indices_from_csr_to_coo(
+        ccol_indices, row_indices, out_int32, true /* transpose */);
+    return _block_sparse_to_dense(self.sizes(), indices, self.values());
   }
   if (self.layout() == kSparseBsr) {
     TORCH_CHECK(self.dim() == 2, "Can only convert 2D SparseBsr to Strided.");
@@ -540,8 +546,22 @@ Tensor _tile_tensor(const Tensor& self, IntArrayRef blocksize) {
   //
   //  via a 4D Tensor of shape (2, 2, 2, 2)
   //
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(blocksize[0] > 0);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(blocksize[1] > 0);
+  TORCH_CHECK(
+      blocksize[0] > 0 && blocksize[1] > 0,
+      "blocksize needs to be non zero, but got ",
+      blocksize);
+  TORCH_CHECK(
+      self.size(0) % blocksize[0] == 0,
+      "Tensor size(0) ",
+      self.size(0),
+      " needs to be divisible by blocksize[0] ",
+      blocksize[0]);
+  TORCH_CHECK(
+      self.size(1) % blocksize[1] == 0,
+      "Tensor size(1) ",
+      self.size(1),
+      " needs to be divisible by blocksize[1] ",
+      blocksize[1]);
   auto block_size_0 = self.size(0) / blocksize[0];
   auto block_size_1 = self.size(1) / blocksize[1];
   return self.reshape({block_size_0, blocksize[0], block_size_1, blocksize[1]})
@@ -564,22 +584,6 @@ std::pair<Tensor, Tensor> _not_zero_mask_to_col_row_indices(
 
 Tensor dense_to_sparse_bsr(const Tensor& self, IntArrayRef blocksize) {
   TORCH_CHECK(self.dim() == 2, "Can only covert 2D Tensor to BSR.");
-  TORCH_CHECK(
-      blocksize[0] > 0 && blocksize[1] > 0,
-      "blocksize needs to be non zero, but got ",
-      blocksize);
-  TORCH_CHECK(
-      self.size(0) % blocksize[0] == 0,
-      "Tensor size(0) ",
-      self.size(0),
-      " needs to be divisible by blocksize[0] ",
-      blocksize[0]);
-  TORCH_CHECK(
-      self.size(1) % blocksize[1] == 0,
-      "Tensor size(1) ",
-      self.size(1),
-      " needs to be divisible by blocksize[1] ",
-      blocksize[1]);
   auto block_size_0 = self.size(0) / blocksize[0];
 
   auto values = _tile_tensor(self, blocksize);
@@ -612,9 +616,38 @@ Tensor dense_to_sparse_bsr(const Tensor& self, IntArrayRef blocksize) {
 }
 
 Tensor dense_to_sparse_bsc(const Tensor& self, IntArrayRef blocksize) {
-  AT_ERROR(
-      "Conversion from ", self.layout(), " to SparseBsc is currently not supported.");
-  return self;
+  TORCH_CHECK(self.dim() == 2, "Can only covert 2D Tensor to BSR.");
+
+  auto values = _tile_tensor(self, blocksize);
+  auto not_zero_mask = _tile_tensor((self != 0), blocksize);
+  // Find tiles that have at least 1 non-zero value in them.
+  not_zero_mask = not_zero_mask.any(-1).any(-1);
+  Tensor col_indices;
+  Tensor row_indices;
+  std::tie(col_indices, row_indices) =
+      _not_zero_mask_to_col_row_indices(not_zero_mask);
+  Tensor ccol_indices = at::_convert_indices_from_coo_to_csr(
+      col_indices.view({-1}),
+      self.size(1) / blocksize[1],
+      false /* out_int32 */);
+  // TODO: masked_select does not support some form of broadcasting, so we're
+  // using the mask to construct indices that are then passed into index_select.
+  // This isn't ideal.
+  not_zero_mask = not_zero_mask.reshape({-1});
+  values = values.reshape({-1, values.size(-2), values.size(-1)})
+               .index_select(
+                   0,
+                   at::native::arange(not_zero_mask.numel())
+                       .masked_select(not_zero_mask));
+
+  return at::native::_sparse_bsr_tensor_unsafe(
+      ccol_indices,
+      row_indices,
+      values,
+      self.sizes(),
+      values.scalar_type(),
+      c10::kSparseBsr,
+      values.device());
 }
 
 Tensor sparse_compressed_to_sparse_csr(const Tensor& self) {
