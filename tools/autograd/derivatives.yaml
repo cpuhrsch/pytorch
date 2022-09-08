@@ -2723,8 +2723,13 @@
   result: auto_linear
 
 - name: unbind.int(Tensor(a -> *) self, int dim=0) -> Tensor(a)[]
-  self: unbind_backward(grads, dim)
-  result: auto_linear
+  dispatch:
+    Default:
+      self: unbind_backward(grads, dim)
+      result: auto_linear
+    AutogradNestedTensor:
+      # TODO: replace this function once semantics for nested tensor expand have been settled on
+      self: _nested_unbind_backward(grads, dim)
 
 - name: stack(Tensor[] tensors, int dim=0) -> Tensor
   tensors: "grad.defined() ? unbind(grad, dim) : std::vector<Tensor>(tensors.size())"

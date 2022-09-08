@@ -84,6 +84,13 @@ std::vector<at::Tensor> NestedTensor_unbind(
   return result_tensors;
 }
 
+std::vector<at::Tensor> NestedTensor_unbind_backward(
+    TensorList list,
+    int64_t dim) {
+  TORCH_CHECK(false, "GOT EM");
+  return at::ones({});
+}
+
 Tensor& NestedTensor_relu_(Tensor& self) {
   auto buffer = get_nested_tensor_impl(self)->get_buffer();
   at::relu_(buffer);

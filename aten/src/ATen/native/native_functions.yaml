@@ -6328,6 +6328,11 @@
 - func: unbind.Dimname(Tensor(a -> *) self, Dimname dim) -> Tensor(a)[]
   variants: function, method
 
+# TODO: this function will be replaced once nested expand semantics have been settled on
+- func: _nested_unbind_backward(TensorList grads, int dim)
+  dispatch:
+    NestedTensorCPU, NestedTensorCUDA: NestedTensor_unbind_backward
+
 - func: to_sparse.sparse_dim(Tensor self, int sparse_dim) -> Tensor
   variants: method
   dispatch:
