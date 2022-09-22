@@ -5155,6 +5155,7 @@
     MkldnnCPU: mkldnn_tanh
     SparseCPU, SparseCUDA: tanh_sparse
     SparseCsrCPU, SparseCsrCUDA: tanh_sparse_csr
+    NestedTensorCPU, NestedTensorCUDA: NestedTensor_tanh
 
 - func: tanh_(Tensor(a!) self) -> Tensor(a!)
   device_check: NoCheck   # TensorIterator
@@ -11319,6 +11320,7 @@
   dispatch:
     CPU, CUDA: tanh_backward_out
     MPS: tanh_backward_out_mps
+    NestedTensorCPU, NestedTensorCUDA: NestedTensor_tanh_backward_out
 
 - func: tanh_backward(Tensor grad_output, Tensor output) -> Tensor
   python_module: nn
