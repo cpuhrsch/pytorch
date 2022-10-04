@@ -249,5 +249,40 @@ Tensor flash_scaled_dot_product_attention(
   return Tensor{};
 }
 
+Tensor softmax_nested_cuda(
+    const Tensor& input,
+    const int64_t dim,
+    const bool half_to_float) {
+  auto input_ptr = get_nested_tensor_impl(input);
+  int64_t ntensors = input_ptr->size(0);
+  if (ntensors == 0) {
+    return input.clone();
+  }
+  int64_t positive_dim = at::maybe_wrap_dim(dim, input_ptr->dim());
+  TORCH_CHECK(
+      positive_dim >= 1,
+      "Cannot apply softmax across nested dimension 0");
+  // create a contiguous output
+  const Tensor& buffer = input_ptr->get_buffer(),
+      & sizemat = input_ptr->get_nested_size_tensor();
+  Tensor output_buffer = buffer.new_empty(buffer.sizes());
+  Tensor output = wrap_buffer(output_buffer, sizemat.clone());
+  // call tensor softmax
+  // TODO: for cpu, maybe use `parallel_for` if benchmarks show necessity
+  //       to do that, have to merge `aten/src/ATen/native/cpu/SoftMaxKernel.cpp/softmax_kernel`
+  //       1. it has `parallel_for` and we cannot multi-thread in multi-thread
+  //       2. cannot dispatch in multi-thread (in this case at::_softmax_out)
+  std::vector<Tensor> input_unbind = input.unbind(),
+      output_unbind = output.unbind();
+  for (int64_t i = 0; i < ntensors; i++) {
+    at::_softmax_out(
+        output_unbind[i],
+        input_unbind[i],
+        positive_dim - 1,
+        half_to_float);
+  }
+  return output;
+}
+
 } // namespace native
 } // namespace at

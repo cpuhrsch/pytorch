@@ -16,6 +16,8 @@
 
 #include <ATen/native/nested/NestedTensorTransformerFunctions.h>
 
+#include <c10/util/Half.h>
+
 #define BLOCK_DIM 256
 #define GRID_DIM_Y 16
 
@@ -448,6 +450,172 @@ template void add_padding_kernelLauncher<c10::Half>(
     const std::vector<int64_t>& output_sizes,
     const int batch_size,
     const int output_batch_size);
+
+/// ************************** softmax for attention **************************
+// softmax kernel code is copied from
+// https://raw.githubusercontent.com/NVIDIA/FasterTransformer/main/fastertransformer/cuda/attention_kernels.cu
+
+namespace {
+
+#define FINAL_MASK 0xffffffff
+
+template <typename T>
+__inline__ __device__
+T warpReduceSum(T val)
+{
+  for(int mask = 16; mask > 0; mask >>= 1)
+    val += __shfl_xor_sync(FINAL_MASK, val, mask, 32);
+  return val;
+}
+
+/* Calculate the sum of all elements in a block */
+template <typename T>
+  __inline__ __device__
+T blockReduceSum(T val)
+{
+  static __shared__ T shared[32]; 
+  int lane = threadIdx.x & 0x1f; 
+  int wid = threadIdx.x >> 5;  
+
+  val = warpReduceSum<T>(val);
+
+  if(lane == 0)
+    shared[wid] = val;
+
+  __syncthreads();
+
+  val = (threadIdx.x < (blockDim.x >> 5 )) ? shared[lane] : (T)(0.0f);
+  val = warpReduceSum<T>(val);
+                              
+  return val;
+}
+
+template <typename T>
+  __inline__ __device__
+T warpReduceMax(T val)
+{
+  for(int mask = 16; mask > 0; mask >>= 1) {
+    T tmp = __shfl_xor_sync(FINAL_MASK, val, mask, 32);
+    if (tmp > val) {
+      val = tmp;
+    }
+  }
+  return val;
+}
+
+/* Calculate the maximum of all elements in a block */
+template <typename T>
+  __inline__ __device__
+T blockReduceMax(T val)
+{
+  static __shared__ T shared[32]; 
+  int lane = threadIdx.x & 0x1f; // in-warp idx
+  int wid = threadIdx.x >> 5;  // warp idx
+
+  val = warpReduceMax(val); // get maxx in each warp
+
+  if(lane == 0) // record in-warp maxx by warp Idx
+    shared[wid] = val;
+
+  __syncthreads();
+
+
+  val = (threadIdx.x < (blockDim.x >> 5 )) ? shared[lane] : 0;
+  val = warpReduceMax(val);
+
+  return val;
+}
+
+template <typename T>
+__global__
+void softmax_kernel(T* qk_buf_, const T* attr_mask, const int batch_size, const int head_num, const int seq_len, 
+  const T scalar)
+{
+    int batch_id = blockIdx.x / head_num;
+    int qk_offset = blockIdx.x * seq_len * seq_len;
+    int mask_offset = batch_id * seq_len * seq_len;
+
+    __shared__ float s_sum, s_max;
+
+    for(int i = 0; i < seq_len; ++i)
+    {
+      float qk = threadIdx.x < seq_len ? (float)qk_buf_[threadIdx.x + qk_offset] : 0.0f;
+      float mask_val = threadIdx.x < seq_len ? (float)attr_mask[threadIdx.x + mask_offset] : 0.0f;
+      
+      mask_val = (1.0f - mask_val) * -10000.0f;
+
+      float tmp = threadIdx.x < seq_len ? (float)(qk * (float)scalar + mask_val): -1e20f;
+
+      float max_val = blockReduceMax<float>(tmp);
+
+      if(threadIdx.x == 0)
+        s_max = max_val;
+      __syncthreads();
+
+      qk = threadIdx.x < seq_len ? __expf(tmp - s_max) : 0.0f;
+
+      float sum_val = blockReduceSum<float>(qk);
+
+      if(threadIdx.x == 0)
+      {
+        s_sum = sum_val + 1e-6f;
+      }
+      __syncthreads();
+
+      if(threadIdx.x < seq_len)
+        qk_buf_[threadIdx.x + qk_offset] = (T)(qk / s_sum);
+
+      qk_offset += seq_len;
+      mask_offset += seq_len;
+    }
+}
+
+}
+
+// Changed this align with prior API
+// Renamed and switched head_num with seq_len
+template<typename T>
+void softmax_kernel_kernelLauncher(
+  T* buffer,
+  const T* attr_mask,
+  const int batch_size,
+  const int head_num,
+  const int seq_len,
+  const T scalar,
+  cudaStream_t stream)
+{
+  dim3 grid, block;
+  if(seq_len <= 32) {
+    block.x = 32;
+  } else if(seq_len > 32 && seq_len <= 64) {
+    block.x = 64;
+  } else if(seq_len > 64 && seq_len <= 128) {
+    block.x = 128;
+  } else if(seq_len > 128 && seq_len <= 256) {
+    block.x = 256;
+  } else if(seq_len > 256 && seq_len <= 512) {
+    block.x = 512;
+  } else {
+    block.x = 1024;
+  }
+
+  grid.x = batch_size * head_num;
+  softmax_kernel<T><<<grid, block, 0, stream>>>(buffer, attr_mask, batch_size, head_num, seq_len, scalar);
+}
+
+template void softmax_kernel_kernelLauncher<float>(
+    float* qk_buf_, const float* attr_mask, 
+    const int batch_size, const int head_num, const int seq_len, 
+    const float scaler,
+    const cudaStream_t stream);
+
+template void softmax_kernel_kernelLauncher<c10::Half>(
+    c10::Half* qk_buf_, const c10::Half* attr_mask, 
+    const int batch_size, const int head_num, const int seq_len, 
+    const c10::Half scaler,
+    const cudaStream_t stream);
+
+/// *********************************** fin ***********************************
 
 } // namespace native
 } // namespace at
