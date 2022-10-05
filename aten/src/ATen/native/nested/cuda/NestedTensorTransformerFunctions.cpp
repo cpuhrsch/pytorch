@@ -263,10 +263,16 @@ Tensor softmax_nested_cuda(
       positive_dim >= 1,
       "Cannot apply softmax across nested dimension 0");
   // create a contiguous output
-  const Tensor& buffer = input_ptr->get_buffer(),
-      & sizemat = input_ptr->get_nested_size_tensor();
+  const Tensor& buffer = input_ptr->get_buffer();
+  auto last_size = input_ptr->opt_size(-1);
   Tensor output_buffer = buffer.new_empty(buffer.sizes());
-  Tensor output = wrap_buffer(output_buffer, sizemat.clone());
+  // Use specialized kernel if input is 4D and the last two dimensions are irregular.
+  if (
+      input.dim() == 4 &&
+      input_ptr->opt_size(0) &&
+      input_ptr->opt_size(1)) {
+  }
+  Tensor output = wrap_buffer(output_buffer, input_ptr->get_nested_size_tensor());
   // call tensor softmax
   // TODO: for cpu, maybe use `parallel_for` if benchmarks show necessity
   //       to do that, have to merge `aten/src/ATen/native/cpu/SoftMaxKernel.cpp/softmax_kernel`
