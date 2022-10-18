@@ -64,7 +64,7 @@ def build_composite_mha_from_nn_mha(pt):
 
 def generate_rand_batch(batch_size, max_sequence_len, embed_dimension, pad_percentage=None, dtype=torch.float16, device="cuda"):
     if not pad_percentage:
-        return torch.randn(batch_size, max_sequence_len, embed_dimension, dtype=dtype, device=device), None
+        return torch.randn(batch_size, max_sequence_len, embed_dimension, dtype=dtype, device=device)
     # Really slow but should work
     seq_len_list = [int(max_sequence_len * (1 - random.gauss(pad_percentage, 0.01))) for _ in range(batch_size)]
     # Make random ele max length
@@ -99,8 +99,9 @@ def run_timing(iters, batch_size, embed_dimension, num_heads, max_sequence_len, 
     npt = pt.eval().half().cuda()
     cpt = build_composite_mha_from_nn_mha(npt)
     x = generate_rand_batch(batch_size, max_sequence_len, embed_dimension, pad_percentage)
-    pt_output, _ = pt(x, x, x, mask)
-    cpt_output, _ = cpt(x, x, x, mask)
+    with torch.inference_mode():
+        pt_output, _ = pt(x, x, x, mask)
+        cpt_output, _ = cpt(x, x, x, mask)
 
     # First order sanity check. Not a replacement for rigorous tests.
     if pt_output.is_nested and cpt_output.is_nested:
@@ -120,6 +121,7 @@ def run_timing(iters, batch_size, embed_dimension, num_heads, max_sequence_len, 
             results["cp_time"] = cp_time
             results["speedup"] = pt_time / cp_time
             results["dtype"] = str(x.dtype)
+            results["pad_percentage"] = str(pad_percentage)
             writer.writerow(results)
 
 
@@ -129,15 +131,15 @@ def main():
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-    headers = ["max_sequence_len", "num_heads", "embed_dimension", "pt_time", "cp_time", "speedup", "dtype"]
+    headers = ["max_sequence_len", "num_heads", "embed_dimension", "pt_time", "cp_time", "speedup", "dtype", "pad_percentage"]
     writer = csv.DictWriter(sys.stdout, headers)
     writer.writeheader()
 
     batch_size = 64
-    pad_percentage = 0.5
 
     for num_heads, max_seq_len in itertools.product([2, 4, 8, 16, 32], [64, 128, 256]):
-        run_timing(iters, batch_size, 1024, num_heads, max_seq_len, pad_percentage, writer)
+        run_timing(iters, batch_size, 1024, num_heads, max_seq_len, 0.5, writer)
+        run_timing(iters, batch_size, 1024, num_heads, max_seq_len, None, writer)
 
 
 if __name__ == "__main__":
