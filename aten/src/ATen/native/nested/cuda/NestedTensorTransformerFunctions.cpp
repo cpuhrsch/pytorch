@@ -309,17 +309,17 @@ bool is_safe_to_get_storage_as_tensor(
       value_offsets.cend(),
       value_offset_differences.begin());
 
-  // The first adjacent differences is offsets[0], so skip for comparision
-  bool same_offsets = std::equal(
-                          query_offset_differences.cbegin() + 1,
-                          query_offset_differences.cend(),
-                          key_offset_differences.cbegin() + 1) &&
-      std::equal(key_offset_differences.cbegin() + 1,
-                 key_offset_differences.cend(),
-                 value_offset_differences.cbegin() + 1);
-  if (!same_offsets) {
-    return false;
-  }
+  // // The first adjacent differences is offsets[0], so skip for comparision
+  // bool same_offsets = std::equal(
+  //                         query_offset_differences.cbegin() + 1,
+  //                         query_offset_differences.cend(),
+  //                         key_offset_differences.cbegin() + 1) &&
+  //     std::equal(key_offset_differences.cbegin() + 1,
+  //                key_offset_differences.cend(),
+  //                value_offset_differences.cbegin() + 1);
+  // if (!same_offsets) {
+  //   return false;
+  // }
   const Tensor& query_strides = query->get_nested_stride_tensor();
   const Tensor& key_strides = key->get_nested_stride_tensor();
   const Tensor& value_strides = value->get_nested_stride_tensor();
@@ -327,15 +327,9 @@ bool is_safe_to_get_storage_as_tensor(
   const int64_t n_tensors = query_strides.size(0);
   const int64_t n_dims = query_strides.size(1);
 
-  std::vector<int64_t> previous_q_stride(
-      query_strides.data_ptr<int64_t>(),
-      query_strides.data_ptr<int64_t>() + n_dims);
-  std::vector<int64_t> previous_k_stride(
-      key_strides.data_ptr<int64_t>(),
-      key_strides.data_ptr<int64_t>() + n_dims);
-  std::vector<int64_t> previous_v_stride(
-      value_strides.data_ptr<int64_t>(),
-      value_strides.data_ptr<int64_t>() + n_dims);
+  int64_t* previous_q_stride = query_strides.data_ptr<int64_t>();
+  int64_t* previous_k_stride = key_strides.data_ptr<int64_t>();
+  int64_t* previous_v_stride = value_strides.data_ptr<int64_t>();
 
   // Check initially that they are in strictly descending order
   for (int i{1}; i < n_dims; i++) {
@@ -346,11 +340,15 @@ bool is_safe_to_get_storage_as_tensor(
     }
   }
 
+  auto q_stride_0 = query_strides.stride(0);
+  auto k_stride_0 = key_strides.stride(0);
+  auto v_stride_0 = value_strides.stride(0);
+
   for (int i{1}; i < n_tensors; i++) {
     for (const int64_t j : c10::irange(n_dims)) {
-      if (previous_q_stride[j] != query_strides[i][j].item<int64_t>() ||
-          previous_k_stride[j] != key_strides[i][j].item<int64_t>() ||
-          previous_v_stride[j] != value_strides[i][j].item<int64_t>()) {
+      if (previous_q_stride[j] != previous_q_stride[i * q_stride_0 + j] ||
+          previous_k_stride[j] != previous_k_stride[i * k_stride_0 + j] ||
+          previous_v_stride[j] != previous_v_stride[i * v_stride_0 + j]) {
         return false;
       }
     }
