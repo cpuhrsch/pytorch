@@ -419,14 +419,19 @@ std::tuple<Tensor, Tensor> mem_efficient_helper_nested_unpacked(
 
   auto query_stride_tensor = query_impl->get_nested_stride_tensor();
   auto key_stride_tensor = key_impl->get_nested_stride_tensor();
+  auto value_stride_tensor = value_impl->get_nested_stride_tensor();
 
   const int64_t nnz_q_stride = query_stride_tensor[0][0].item<int64_t>();
   const int64_t head_q_stride = query_stride_tensor[0][1].item<int64_t>();
   const int64_t head_dim_stride = query_stride_tensor[0][2].item<int64_t>();
 
-  const int64_t nnz_kv_stride = key_stride_tensor[0][0].item<int64_t>();
-  const int64_t head_kv_stride = key_stride_tensor[0][1].item<int64_t>();
-  const int64_t head_dim_kv_stride = key_stride_tensor[0][2].item<int64_t>();
+  const int64_t nnz_k_stride = key_stride_tensor[0][0].item<int64_t>();
+  const int64_t head_k_stride = key_stride_tensor[0][1].item<int64_t>();
+  const int64_t head_dim_k_stride = key_stride_tensor[0][2].item<int64_t>();
+
+  const int64_t nnz_v_stride = value_stride_tensor[0][0].item<int64_t>();
+  const int64_t head_v_stride = value_stride_tensor[0][1].item<int64_t>();
+  const int64_t head_dim_v_stride = value_stride_tensor[0][2].item<int64_t>();
 
   query_buffer_reshaped = q_storage_as_tensor.as_strided(
       {Nnz_q, num_heads, head_dim},
@@ -434,11 +439,11 @@ std::tuple<Tensor, Tensor> mem_efficient_helper_nested_unpacked(
       query_impl->get_storage_offsets()[0]);
   key_buffer_reshaped = k_storage_as_tensor.as_strided(
       {Nnz_kv, num_heads, head_dim},
-      {nnz_kv_stride, head_kv_stride, head_dim_kv_stride},
+      {nnz_k_stride, head_k_stride, head_dim_k_stride},
       key_impl->get_storage_offsets()[0]);
   value_buffer_reshaped = v_storage_as_tensor.as_strided(
       {Nnz_kv, num_heads, head_dim},
-      {nnz_kv_stride, head_kv_stride, head_dim_kv_stride},
+      {nnz_v_stride, head_v_stride, head_dim_v_stride},
       value_impl->get_storage_offsets()[0]);
 
   std::tuple<Tensor, Tensor> attention_and_weights =
