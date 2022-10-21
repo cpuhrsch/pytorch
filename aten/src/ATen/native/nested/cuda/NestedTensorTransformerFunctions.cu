@@ -734,6 +734,127 @@ Tensor bmm_nested_cuda(const Tensor& self, const Tensor& mat2) {
   return output;
 }
 
+template<typename T>
+struct ComputeType {
+  using type = T;
+};
+
+template<>
+struct ComputeType<c10::Half> {
+  using type = float;
+};
+
+template<typename T, template<typename> class op>
+__inline__ __device__ T block_reduce(T val) {
+  typedef cub::BlockReduce<T, BLOCK_DIM> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+  __shared__ T result;
+  T temp_result = BlockReduce(temp_storage).Reduce(val, op<T>());
+  if (threadIdx.x == 0) {
+    result = temp_result;
+  }
+  __syncthreads();
+  return result;
+}
+
+template <typename T, typename compute_type>
+__global__ void softmax_dropout(
+    const T* input,
+    T* output,
+    const int64_t batch_size,
+    const int64_t num_heads,
+    const int64_t max_sample_size,
+    const int64_t *sample_sizes) {
+
+  int64_t sample_size = sample_sizes[blockIdx.x];
+  int64_t max_sample_size_2 = max_sample_size * max_sample_size;
+  int64_t max_sample_size_3 = num_heads * max_sample_size_2;
+  int64_t offset = blockIdx.x * max_sample_size_3 + blockIdx.y * max_sample_size_2 + blockIdx.z * max_sample_size;
+  const T *input_ptr = input + offset;
+  T *output_ptr = output + offset;
+  offset = threadIdx.x;
+
+  if(sample_size <= blockIdx.z) {
+    int64_t tail = max_sample_size % blockDim.x;
+    for(; offset < max_sample_size - tail; offset += blockDim.x) {
+      output_ptr[offset] = static_cast<T>(0);
+    }
+    for(; offset < max_sample_size; offset += blockDim.x){
+      output_ptr[offset] = static_cast<T>(0);
+    }
+    return;
+  }
+  // get thread max and load data
+  int64_t tail = sample_size % blockDim.x;
+  int64_t buf_offset;
+  compute_type buf_ptr[(MAX_SEQ_LEN + BLOCK_DIM - 1) / BLOCK_DIM];
+  compute_type thread_max = -numeric_limits<compute_type>::max();
+  for (
+      buf_offset = 0, offset = threadIdx.x;
+      offset < (sample_size - tail);
+      offset += blockDim.x, buf_offset++) {
+    buf_ptr[buf_offset] = input_ptr[offset];
+    thread_max = std::max(buf_ptr[buf_offset], thread_max);
+  }
+  for(; offset < sample_size; offset += blockDim.x, buf_offset++){
+    buf_ptr[buf_offset] = input_ptr[offset];
+    thread_max = std::max(buf_ptr[buf_offset], thread_max);
+  }
+  // reduce block max
+  thread_max = block_reduce<compute_type, Max>(thread_max);
+  // get thread sum
+  compute_type thread_sum = static_cast<compute_type>(0);
+  for (
+      buf_offset = 0, offset = threadIdx.x;
+      offset < (sample_size - tail);
+      offset += blockDim.x, buf_offset++) {
+    buf_ptr[buf_offset] = std::exp(buf_ptr[buf_offset]-thread_max);
+    thread_sum += buf_ptr[buf_offset];
+  }
+  for(; offset < sample_size; offset += blockDim.x, buf_offset++){
+    buf_ptr[buf_offset] = std::exp(buf_ptr[buf_offset]-thread_max);
+    thread_sum += buf_ptr[buf_offset];
+  }
+  // reduce block sum
+  thread_sum = block_reduce<compute_type, Add>(thread_sum);
+
+  tail = max_sample_size % blockDim.x;
+  for (
+      buf_offset = 0, offset = threadIdx.x;
+      offset < (max_sample_size - tail);
+      offset += blockDim.x, buf_offset++) {
+    output_ptr[offset] = offset < sample_size ? static_cast<T>(buf_ptr[buf_offset] / thread_sum) : static_cast<T>(0);
+  }
+  for(; offset < max_sample_size; offset += blockDim.x, buf_offset++){
+    output_ptr[offset] = offset < sample_size ? static_cast<T>(buf_ptr[buf_offset] / thread_sum) : static_cast<T>(0);
+  }
+}
+
+
+template <typename T>
+void softmax_dropout_kernelLauncher(
+    const T* input,
+    T* output,
+    const int64_t batch_size,
+    const int64_t num_heads,
+    const int64_t max_sample_size,
+    const std::vector<int64_t>& sample_size) {
+  at::cuda::CUDAStream stream = at::cuda::getDefaultCUDAStream();
+  // TODO: Optimize settings by getting device properties
+  dim3 grid_dim;
+  grid_dim.x = batch_size;
+  grid_dim.y = num_heads;
+  grid_dim.z = max_sample_size;
+  using compute_type = typename ComputeType<T>::type;
+  uint64_t shared_memory_size = sizeof(compute_type) * ((BLOCK_DIM + C10_WARP_SIZE - 1) / C10_WARP_SIZE);
+  int64_t *sample_size_ptr;
+  cudaMalloc((void **)&sample_size_ptr, sizeof(int64_t) * batch_size);
+  cudaMemcpy(sample_size_ptr, &sample_size[0], sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice);
+  softmax_dropout<T, compute_type><<<grid_dim, BLOCK_DIM, shared_memory_size, stream>>>(
+      input, output, batch_size, num_heads, max_sample_size, sample_size_ptr);
+  cudaFree(sample_size_ptr);
+}
+
 Tensor softmax_nested_cuda(
     const Tensor& input,
     const int64_t dim,
