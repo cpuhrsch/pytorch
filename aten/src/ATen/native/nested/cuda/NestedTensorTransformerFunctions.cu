@@ -734,5 +734,41 @@ Tensor bmm_nested_cuda(const Tensor& self, const Tensor& mat2) {
   return output;
 }
 
+Tensor softmax_nested_cuda(
+    const Tensor& input,
+    const int64_t dim,
+    const bool half_to_float) {
+  const auto* query_nt = get_nested_tensor_impl_or_null(query);
+  TORCH_INTERNAL_ASSERT(query_nt != nullptr);
+  TORCH_INTERNAL_ASSERT(nested_tensor_impl_is_contiguous(query_nt));
+
+  const Tensor& sizes = query_nt->get_nested_size_tensor();
+  const int64_t num_tensors = static_cast<int64_t>(sizes.sizes()[0]);
+  const int64_t num_heads = static_cast<int64_t>(attn_scores.sizes()[1]);
+  const int64_t max_seq_len = static_cast<int64_t>(attn_scores.sizes()[2]);
+  std::vector<int64_t> seq_lens = std::vector<int64_t>();
+  for (int64_t i = 0; i < num_tensors; i++) {
+    seq_lens.push_back(sizes.index({i, 0}).item<int64_t>());
+  }
+
+  if (attn_scores.dtype() == kDouble) {
+    softmax_dropout_kernelLauncher(
+        attn_scores.data_ptr<double>(), attn_scores.data_ptr<double>(),
+        num_tensors, num_heads, max_seq_len, seq_lens);
+  } else if (attn_scores.dtype() == kFloat) {
+    softmax_dropout_kernelLauncher(
+        attn_scores.data_ptr<float>(), attn_scores.data_ptr<float>(),
+        num_tensors, num_heads, max_seq_len, seq_lens);
+  } else if (attn_scores.dtype() == kHalf) {
+    softmax_dropout_kernelLauncher(
+        attn_scores.data_ptr<c10::Half>(), attn_scores.data_ptr<c10::Half>(),
+        num_tensors, num_heads, max_seq_len, seq_lens);
+  } else{
+    AT_ERROR("Only support fp64/fp32/fp16 for softmax_dropout_cuda");
+  }
+  return attn_scores;
+}
+
+
 } // namespace native
 } // namespace at

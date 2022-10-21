@@ -769,7 +769,7 @@ std::tuple<Tensor,Tensor> native_dropout_nested(const Tensor& input, double p, c
   return std::make_tuple(output, mask);
 }
 
-Tensor softmax_nested(
+Tensor softmax_nested_cpu(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
