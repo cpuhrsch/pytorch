@@ -1022,7 +1022,7 @@ class TestNestedTensorDeviceType(TestCase):
             return
         seq_lens = [15, 10, 5, 6]
         num_heads = 8
-        tensors = [torch.randn(num_heads, i, i) for i in seq_lens]
+        tensors = [torch.randn(num_heads, i, i, dtype=dtype, device=device) for i in seq_lens]
         nt = torch.nested.nested_tensor(tensors, dtype=dtype, device=device)
         nt_result = nt.softmax(-1)
         for t, nt_ref in zip(tensors, nt_result.unbind()):

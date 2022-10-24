@@ -768,28 +768,12 @@ __global__ void softmax(
     const T* input,
     T* output,
     const int64_t batch_size,
-    const int64_t num_heads,
-    const int64_t max_sample_size,
-    const int64_t* sample_sizes) {
-  int64_t sample_size = sample_sizes[blockIdx.x];
-  int64_t max_sample_size_2 = max_sample_size * max_sample_size;
-  int64_t max_sample_size_3 = num_heads * max_sample_size_2;
-  int64_t offset = blockIdx.x * max_sample_size_3 +
-      blockIdx.y * max_sample_size_2 + blockIdx.z * max_sample_size;
-  const T* input_ptr = input + offset;
-  T* output_ptr = output + offset;
-  offset = threadIdx.x;
+    const int32_t* sample_sizes) {
+  int32_t sample_size = sample_sizes[blockIdx.x];
+  const T* input_ptr = input + sample_size;
+  T* output_ptr = output + sample_size;
+  int64_t offset = threadIdx.x;
 
-  if (sample_size <= blockIdx.z) {
-    int64_t tail = max_sample_size % blockDim.x;
-    for (; offset < max_sample_size - tail; offset += blockDim.x) {
-      output_ptr[offset] = static_cast<T>(0);
-    }
-    for (; offset < max_sample_size; offset += blockDim.x) {
-      output_ptr[offset] = static_cast<T>(0);
-    }
-    return;
-  }
   // get thread max and load data
   int64_t tail = sample_size % blockDim.x;
   int64_t buf_offset;
@@ -820,18 +804,11 @@ __global__ void softmax(
   // reduce block sum
   thread_sum = block_reduce<compute_type, Add>(thread_sum);
 
-  tail = max_sample_size % blockDim.x;
-  for (buf_offset = 0, offset = threadIdx.x; offset < (max_sample_size - tail);
-       offset += blockDim.x, buf_offset++) {
-    output_ptr[offset] = offset < sample_size
-        ? static_cast<T>(buf_ptr[buf_offset] / thread_sum)
-        : static_cast<T>(0);
-  }
-  for (; offset < max_sample_size; offset += blockDim.x, buf_offset++) {
-    output_ptr[offset] = offset < sample_size
-        ? static_cast<T>(buf_ptr[buf_offset] / thread_sum)
-        : static_cast<T>(0);
-  }
+  // for (; offset < max_sample_size; offset += blockDim.x, buf_offset++) {
+  //   output_ptr[offset] = offset < sample_size
+  //       ? static_cast<T>(buf_ptr[buf_offset] / thread_sum)
+  //       : static_cast<T>(0);
+  // }
 }
 
 template <typename T>
@@ -839,31 +816,22 @@ void softmax_kernelLauncher(
     const T* input,
     T* output,
     const int64_t batch_size,
-    const int64_t num_heads,
-    const int64_t max_sample_size,
-    int64_t* sample_size_ptr) {
+    int32_t* sample_size_ptr) {
   at::cuda::CUDAStream stream = at::cuda::getDefaultCUDAStream();
   // TODO: Optimize settings by getting device properties
   dim3 grid_dim;
   grid_dim.x = batch_size;
-  grid_dim.y = num_heads;
-  grid_dim.z = max_sample_size;
   using compute_type = typename ComputeType<T>::type;
   uint64_t shared_memory_size =
       sizeof(compute_type) * ((BLOCK_DIM + C10_WARP_SIZE - 1) / C10_WARP_SIZE);
   softmax<T, compute_type><<<grid_dim, BLOCK_DIM, shared_memory_size, stream>>>(
-      input, output, batch_size, num_heads, max_sample_size, sample_size_ptr);
+      input, output, batch_size, sample_size_ptr);
 }
 
-std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(Tensor qkv) {
-  TORCH_CHECK(
-      qkv.is_nested(),
-      "QKV must be nested for flash cumulative_seq_len calculation.")
-  auto* nt_impl = get_nested_tensor_impl(qkv);
-  const auto& sizes = nt_impl->get_nested_size_tensor();
+std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(const Tensor& sizes) {
   auto size_tensor_stride = sizes.stride(0);
 
-  const int64_t batch_size = qkv.size(0);
+  const int64_t batch_size = sizes.size(0);
   auto cumulative_seqlen = at::zeros(
       {batch_size + 1}, TensorOptions().device(at::kCPU).dtype(at::kInt));
 
@@ -875,7 +843,7 @@ std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(Tensor qkv) {
   cumulative_seqlen_ptr[0] = sum;
   for (const auto i : c10::irange(batch_size)) {
     // Calculate the cumulative sum of the sequence lengths
-    auto current_seq_len = sizes_ptr[(i * size_tensor_stride)];
+    auto current_seq_len = sizes_ptr[(i * size_tensor_stride) + 1];
     sum += current_seq_len;
     cumulative_seqlen_ptr[i + 1] = sum;
 
@@ -886,6 +854,13 @@ std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(Tensor qkv) {
   // but maybe this needs to be on gpu
   cumulative_seqlen = cumulative_seqlen.to(TensorOptions().device(at::kCUDA));
   return std::tuple<Tensor, int64_t>{cumulative_seqlen, max_seqlen};
+}
+
+Tensor collapse_dims_1_and_2(const Tensor& sizes) {
+  auto sizes_dim1 = at::native::narrow_symint(sizes, 1, 0, 1);
+  auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
+
+  return (sizes_dim1 * sizes_dim2).contiguous();
 }
 
 Tensor NestedTensor_softmax_cuda(
@@ -901,17 +876,17 @@ Tensor NestedTensor_softmax_cuda(
       ) {
     return NestedTensor_softmax_generic(input, dim, half_to_float);
   }
+  auto buffer = get_buffer(input);
+  auto sizes = collapse_dims_1_and_2(query_nt->get_nested_size_tensor());
+
   // TORCH_CHECK(input.contiguous(), "Need input to be contiguous.");
   // TODO: "Extra checks needed:
   // size(1) has to be regular
   // size(2) needs to equal size(3)
 
-  const Tensor& sizes = query_nt->get_nested_size_tensor();
   const int64_t num_tensors = input.size(0);
   const int64_t num_heads = input.size(1);
-  const int64_t max_seq_len = NestedTensor_get_max_size(*query_nt)[2];
-  const int64_t* sizes_data_ptr = sizes.data_ptr<int64_t>();
-  auto cumulative_and_max_q = cumulative_and_max_seq_len2(input);
+  auto cumulative_and_max_q = cumulative_and_max_seq_len2(sizes);
   Tensor cumulative_sequence_length_q = std::get<0>(cumulative_and_max_q);
   std::cout << "cumulative_sequence_length_q: " << cumulative_sequence_length_q << std::endl;
 
@@ -921,26 +896,20 @@ Tensor NestedTensor_softmax_cuda(
     softmax_kernelLauncher(
         input.data_ptr<double>(),
         output.data_ptr<double>(),
-        num_tensors,
-        num_heads,
-        max_seq_len,
-        cumulative_sequence_length_q.data_ptr<int64_t>());
+        num_tensors * num_heads,
+        cumulative_sequence_length_q.data_ptr<int32_t>());
   } else if (input.dtype() == kFloat) {
     softmax_kernelLauncher(
         input.data_ptr<float>(),
         output.data_ptr<float>(),
-        num_tensors,
-        num_heads,
-        max_seq_len,
-        cumulative_sequence_length_q.data_ptr<int64_t>());
+        num_tensors * num_heads,
+        cumulative_sequence_length_q.data_ptr<int32_t>());
   } else if (input.dtype() == kHalf) {
     softmax_kernelLauncher(
         input.data_ptr<c10::Half>(),
         output.data_ptr<c10::Half>(),
-        num_tensors,
-        num_heads,
-        max_seq_len,
-        cumulative_sequence_length_q.data_ptr<int64_t>());
+        num_tensors * num_heads,
+        cumulative_sequence_length_q.data_ptr<int32_t>());
   } else {
     AT_ERROR("Only support fp64/fp32/fp16 for softmax_cuda");
   }
