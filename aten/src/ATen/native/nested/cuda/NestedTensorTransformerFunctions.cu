@@ -763,28 +763,27 @@ __inline__ __device__ T block_reduce(T val) {
 }
 
 #define MAX_SEQ_LEN 66536
+// Assumes that it's given a variably shapes
+// list of square matrices for last dim softmax.
 template <typename T, typename compute_type>
-__global__ void softmax(
+__global__ void softmax_squares(
     const T* input,
     T* output,
     const int64_t batch_size,
-    const int32_t* sample_sizes) {
-  int32_t sample_size = sample_sizes[blockIdx.x];
-  const T* input_ptr = input + sample_size;
-  T* output_ptr = output + sample_size;
-  int64_t offset = threadIdx.x;
+    const int32_t* batch_offsets) {
+  int32_t batch_offset = batch_offsets[blockIdx.x];
+  const T* input_ptr = input + batch_offset;
+  T* output_ptr = output + batch_offset;
+  // Size of entire square matrix
+  int64_t sample_size = batch_offsets[blockIdx.x + 1] - batch_offset;
 
-  // get thread max and load data
-  int64_t tail = sample_size % blockDim.x;
-  int64_t buf_offset;
+  int64_t offset = threadIdx.x;
+  int64_t buf_offset = 0;
+  int64_t rowId = 0;
+  int64_t colId = 0;
   compute_type buf_ptr[(MAX_SEQ_LEN + BLOCK_DIM - 1) / BLOCK_DIM];
   compute_type thread_max = -std::numeric_limits<compute_type>::max();
-  for (buf_offset = 0, offset = threadIdx.x; offset < (sample_size - tail);
-       offset += blockDim.x, buf_offset++) {
-    buf_ptr[buf_offset] = input_ptr[offset];
-    thread_max = buf_ptr[buf_offset] < thread_max ? thread_max : buf_ptr[buf_offset];
-  }
-  for (; offset < sample_size; offset += blockDim.x, buf_offset++) {
+  for (; (offset * offset) < sample_size; offset += blockDim.x, buf_offset++) {
     buf_ptr[buf_offset] = input_ptr[offset];
     thread_max = buf_ptr[buf_offset] < thread_max ? thread_max : buf_ptr[buf_offset];
   }
@@ -804,11 +803,11 @@ __global__ void softmax(
   // reduce block sum
   thread_sum = block_reduce<compute_type, Add>(thread_sum);
 
-  // for (; offset < max_sample_size; offset += blockDim.x, buf_offset++) {
-  //   output_ptr[offset] = offset < sample_size
-  //       ? static_cast<T>(buf_ptr[buf_offset] / thread_sum)
-  //       : static_cast<T>(0);
-  // }
+  for (; offset < max_sample_size; offset += blockDim.x, buf_offset++) {
+    output_ptr[offset] = offset < sample_size
+        ? static_cast<T>(buf_ptr[buf_offset] / thread_sum)
+        : static_cast<T>(0);
+  }
 }
 
 template <typename T>
@@ -824,7 +823,7 @@ void softmax_kernelLauncher(
   using compute_type = typename ComputeType<T>::type;
   uint64_t shared_memory_size =
       sizeof(compute_type) * ((BLOCK_DIM + C10_WARP_SIZE - 1) / C10_WARP_SIZE);
-  softmax<T, compute_type><<<grid_dim, BLOCK_DIM, shared_memory_size, stream>>>(
+  softmax_squares<T, compute_type><<<grid_dim, BLOCK_DIM, shared_memory_size, stream>>>(
       input, output, batch_size, sample_size_ptr);
 }
 
@@ -843,7 +842,9 @@ std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(const Tensor& sizes) {
   cumulative_seqlen_ptr[0] = sum;
   for (const auto i : c10::irange(batch_size)) {
     // Calculate the cumulative sum of the sequence lengths
-    auto current_seq_len = sizes_ptr[(i * size_tensor_stride) + 1];
+    auto current_seq_len = sizes_ptr[(i * size_tensor_stride)];
+    assert (current_seq_len == sizes_ptr[(i * size_tensor_stride) + 1]);
+    current_seq_len = current_seq_len * current_seq_len;
     sum += current_seq_len;
     cumulative_seqlen_ptr[i + 1] = sum;
 
