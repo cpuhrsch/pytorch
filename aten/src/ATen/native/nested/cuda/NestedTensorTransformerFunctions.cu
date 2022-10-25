@@ -764,26 +764,35 @@ __inline__ __device__ T block_reduce(T val) {
 
 #define MAX_SEQ_LEN 66536
 // Assumes that it's given a variably shapes
-// list of square matrices for last dim softmax.
+// list of batched square matrices for last dim softmax.
 template <typename T, typename compute_type>
 __global__ void softmax_squares(
     const T* input,
     T* output,
     const int64_t batch_size,
-    const int32_t* batch_offsets) {
+    const int64_t num_heads,
+    const int32_t* batch_offsets,
+    const int64_t* seq_lens) {
   int32_t batch_offset = batch_offsets[blockIdx.x];
   const T* input_ptr = input + batch_offset;
   T* output_ptr = output + batch_offset;
+  const int64_t seq_len = seq_lens[blockIdx.x];
   // Size of entire square matrix
-  int64_t sample_size = batch_offsets[blockIdx.x + 1] - batch_offset;
 
-  int64_t offset = threadIdx.x;
+  int64_t offset = batch_offset;
+  int64_t next_offset = batch_offsets[blockIdx.x];
   int64_t buf_offset = 0;
   int64_t rowId = 0;
   int64_t colId = 0;
   compute_type buf_ptr[(MAX_SEQ_LEN + BLOCK_DIM - 1) / BLOCK_DIM];
   compute_type thread_max = -std::numeric_limits<compute_type>::max();
-  for (; (offset * offset) < sample_size; offset += blockDim.x, buf_offset++) {
+  for (int64_t i = 0; i < num_heads; i++) {
+    for (int64_t j = 0; i < seq_len; j++) {
+      for (int64_t k = 0; i < seq_len; k++) {
+      }
+    }
+  }
+  for (; offset < ; offset += blockDim.x, buf_offset++) {
     buf_ptr[buf_offset] = input_ptr[offset];
     thread_max = buf_ptr[buf_offset] < thread_max ? thread_max : buf_ptr[buf_offset];
   }
@@ -815,7 +824,9 @@ void softmax_kernelLauncher(
     const T* input,
     T* output,
     const int64_t batch_size,
-    int32_t* sample_size_ptr) {
+    const int64_t num_heads,
+    int32_t* sample_size_ptr,
+    int64_t* seq_lens) {
   at::cuda::CUDAStream stream = at::cuda::getDefaultCUDAStream();
   // TODO: Optimize settings by getting device properties
   dim3 grid_dim;
@@ -824,10 +835,11 @@ void softmax_kernelLauncher(
   uint64_t shared_memory_size =
       sizeof(compute_type) * ((BLOCK_DIM + C10_WARP_SIZE - 1) / C10_WARP_SIZE);
   softmax_squares<T, compute_type><<<grid_dim, BLOCK_DIM, shared_memory_size, stream>>>(
-      input, output, batch_size, sample_size_ptr);
+      input, output, batch_size, num_heads, sample_size_ptr, seq_lens);
 }
 
-std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(const Tensor& sizes) {
+std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(int64_t num_heads,
+    const Tensor& sizes) {
   auto size_tensor_stride = sizes.stride(0);
 
   const int64_t batch_size = sizes.size(0);
@@ -842,9 +854,9 @@ std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(const Tensor& sizes) {
   cumulative_seqlen_ptr[0] = sum;
   for (const auto i : c10::irange(batch_size)) {
     // Calculate the cumulative sum of the sequence lengths
-    auto current_seq_len = sizes_ptr[(i * size_tensor_stride)];
-    assert (current_seq_len == sizes_ptr[(i * size_tensor_stride) + 1]);
-    current_seq_len = current_seq_len * current_seq_len;
+    auto current_seq_len = sizes_ptr[(i * size_tensor_stride) + 1];
+    // Processing batches of squares matrices
+    current_seq_len = current_seq_len * current_seq_len * num_heads;
     sum += current_seq_len;
     cumulative_seqlen_ptr[i + 1] = sum;
 
@@ -855,13 +867,6 @@ std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(const Tensor& sizes) {
   // but maybe this needs to be on gpu
   cumulative_seqlen = cumulative_seqlen.to(TensorOptions().device(at::kCUDA));
   return std::tuple<Tensor, int64_t>{cumulative_seqlen, max_seqlen};
-}
-
-Tensor collapse_dims_1_and_2(const Tensor& sizes) {
-  auto sizes_dim1 = at::native::narrow_symint(sizes, 1, 0, 1);
-  auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
-
-  return (sizes_dim1 * sizes_dim2).contiguous();
 }
 
 Tensor NestedTensor_softmax_cuda(
@@ -878,7 +883,9 @@ Tensor NestedTensor_softmax_cuda(
     return NestedTensor_softmax_generic(input, dim, half_to_float);
   }
   auto buffer = get_buffer(input);
-  auto sizes = collapse_dims_1_and_2(query_nt->get_nested_size_tensor());
+  auto sizes = query_nt->get_nested_size_tensor();
+  auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
+  auto sizes_dim2_cuda = sizes_dim2.contiguous().to(TensorOptions().device(at::kCUDA));
 
   // TORCH_CHECK(input.contiguous(), "Need input to be contiguous.");
   // TODO: "Extra checks needed:
@@ -887,7 +894,7 @@ Tensor NestedTensor_softmax_cuda(
 
   const int64_t num_tensors = input.size(0);
   const int64_t num_heads = input.size(1);
-  auto cumulative_and_max_q = cumulative_and_max_seq_len2(sizes);
+  auto cumulative_and_max_q = cumulative_and_max_seq_len2(num_heads, sizes);
   Tensor cumulative_sequence_length_q = std::get<0>(cumulative_and_max_q);
   std::cout << "cumulative_sequence_length_q: " << cumulative_sequence_length_q << std::endl;
 
@@ -897,20 +904,26 @@ Tensor NestedTensor_softmax_cuda(
     softmax_kernelLauncher(
         input.data_ptr<double>(),
         output.data_ptr<double>(),
-        num_tensors * num_heads,
-        cumulative_sequence_length_q.data_ptr<int32_t>());
+        num_tensors,
+        num_heads,
+        cumulative_sequence_length_q.data_ptr<int32_t>(),
+        sizes_dim2_cuda.data_ptr<int64_t>());
   } else if (input.dtype() == kFloat) {
     softmax_kernelLauncher(
         input.data_ptr<float>(),
         output.data_ptr<float>(),
-        num_tensors * num_heads,
-        cumulative_sequence_length_q.data_ptr<int32_t>());
+        num_tensors,
+        num_heads,
+        cumulative_sequence_length_q.data_ptr<int32_t>(),
+        sizes_dim2_cuda.data_ptr<int64_t>());
   } else if (input.dtype() == kHalf) {
     softmax_kernelLauncher(
         input.data_ptr<c10::Half>(),
         output.data_ptr<c10::Half>(),
-        num_tensors * num_heads,
-        cumulative_sequence_length_q.data_ptr<int32_t>());
+        num_tensors,
+        num_heads,
+        cumulative_sequence_length_q.data_ptr<int32_t>(),
+        sizes_dim2_cuda.data_ptr<int64_t>());
   } else {
     AT_ERROR("Only support fp64/fp32/fp16 for softmax_cuda");
   }
