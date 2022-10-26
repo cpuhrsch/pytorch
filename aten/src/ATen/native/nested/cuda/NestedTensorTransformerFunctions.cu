@@ -834,44 +834,63 @@ __global__ void softmax_squares(
   const T* input_ptr = input + batch_offset;
   T* output_ptr = output + batch_offset;
   const int64_t seq_len = seq_lens[blockIdx.x];
+  // Size of entire square matrix
   const int64_t seq_len_squared = seq_len * seq_len;
   // One thread per sequence entry. At most 256 sequence length.
-  // If a thread is out of bounds, we exit right here.
-  if (threadIdx.x > seq_len) {
-    return;
-  }
-  // Size of entire square matrix
+  // If a thread is out of bounds, we don't execute.
 
-  compute_type buf_ptr[MAX_SEQ_LEN * MAX_SEQ_LEN];
-  for (int64_t i = 0; i < num_heads; i++) {
-    const T* head_offset = i * seq_len_squared + input_ptr;
-    T* head_offset_out = i * seq_len_squared + output_ptr;
-    // Loading the square matrix into shared memory.
-    for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
-      buf_ptr[threadIdx.x + j] = head_offset[threadIdx.x + j];
-    }
-    for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
-      // The thread's value.
-      compute_type thread_val = buf_ptr[threadIdx.x + j];
-      // Find the max across the threads and share it.
-      thread_val = blockReduceMax(thread_val);
-      // Now every thread has access to the max.
-      // Subtract the max from the data in shared mem and apply exp
-      thread_val = std::exp(buf_ptr[threadIdx.x] - thread_val);
-      // Store the result in shared memory.
-      buf_ptr[threadIdx.x + j] = thread_val;
-      // Now we have to sum all of this together
-      thread_val = blockReduceSum(thread_val);
-      // Now we divide the value in shared memory by this sum
-      // and write out the result into shared memory
-      buf_ptr[threadIdx.x + j] = buf_ptr[threadIdx.x + j] / thread_val;
-    }
-    // Write out the result
-    for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
-      head_offset_out[threadIdx.x + j] = buf_ptr[threadIdx.x + j];
+//    compute_type buf_ptr[MAX_SEQ_LEN * MAX_SEQ_LEN];
+    for (int64_t i = 0; i < num_heads; i++) {
+      const T* head_offset = i * seq_len_squared + input_ptr;
+      T* head_offset_out = i * seq_len_squared + output_ptr;
+//      // Loading the square matrix into shared memory.
+//      for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
+//        buf_ptr[threadIdx.x + j] = head_offset[threadIdx.x + j];
+//      }
+      for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
+        compute_type thread_val;
+        if (threadIdx.x < seq_len) {
+          // The thread's value.
+          thread_val = head_offset[threadIdx.x + j];
+        } else {
+          thread_val = -std::numeric_limits<compute_type>::max();
+        }
+//        if (threadIdx.x < seq_len) {
+//          printf("blockIdx.x: %d threadIdx.x: %d seq_len: %d thread_val: %.6f\n", blockIdx.x, threadIdx.x, seq_len, thread_val);
+//        }
+        // Find the max across the threads and share it.
+        thread_val = blockReduceMax(thread_val);
+//        if (threadIdx.x < seq_len) {
+//          printf("max j: %d blockIdx.x: %d threadIdx.x: %d thread_val: %.6f\n", j, blockIdx.x, threadIdx.x, thread_val);
+//        }
+        // Now every thread has access to the max.
+        // Subtract the max from the data in shared mem and apply exp
+        if (threadIdx.x < seq_len) {
+          head_offset_out[threadIdx.x + j] = std::exp(head_offset[threadIdx.x + j] - thread_val);
+          thread_val = head_offset_out[threadIdx.x + j];
+        } else {
+          thread_val = 0;
+        }
+//        // Store the result in shared memory.
+//        buf_ptr[threadIdx.x + j] = thread_val;
+        // Now we have to sum all of this together
+        thread_val = blockReduceSum(thread_val);
+//        if (threadIdx.x < seq_len) {
+//          printf("sum j: %d blockIdx.x: %d threadIdx.x: %d thread_val: %.6f\n", j, blockIdx.x, threadIdx.x, thread_val);
+//        }
+        // Now we divide the value in shared memory by this sum
+        // and write out the result into shared memory
+        if (threadIdx.x < seq_len) {
+          head_offset_out[threadIdx.x + j] = head_offset_out[threadIdx.x + j] / thread_val;
+        }
+      }
+//      // Write out the result
+//      for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
+//        head_offset_out[threadIdx.x + j] = buf_ptr[threadIdx.x + j];
+//      }
     }
   }
-}
+//}
 
 template <typename T>
 void softmax_kernelLauncher(
@@ -885,12 +904,13 @@ void softmax_kernelLauncher(
   // TODO: Optimize settings by getting device properties
   dim3 grid_dim;
   grid_dim.x = batch_size;
-  std::cout << "batch_size: " << batch_size << std::endl;
+//  std::cout << "batch_size: " << batch_size << std::endl;
+//  std::cout << "num_heads: " << num_heads << std::endl;
   using compute_type = typename ComputeType<T>::type;
-  std::cout << "Actually launching 00" << std::endl;
-  softmax_squares<T, compute_type><<<batch_size, 256>>>(//, MAX_SEQ_LEN * MAX_SEQ_LEN, stream>>>(
+//  std::cout << "Actually launching 00" << std::endl;
+  softmax_squares<T, compute_type><<<batch_size, 256, 0, stream>>>(
       input, output, batch_size, num_heads, sample_size_ptr, seq_lens);
-  std::cout << "Actually done launching" << std::endl;
+//  std::cout << "Actually done launching" << std::endl;
 }
 
 std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(int64_t num_heads,
@@ -949,6 +969,7 @@ Tensor NestedTensor_softmax_cuda(
   std::cout << "LAUNCHING SMALL SQUARES KERNEL" << std::endl;
   auto input_buffer = get_buffer(input);
   auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
+//  std::cout << "sizes_dim2: " << sizes_dim2 << std::endl;
   auto sizes_dim2_cuda = sizes_dim2.contiguous().to(TensorOptions().device(at::kCUDA));
 
   // TORCH_CHECK(input.contiguous(), "Need input to be contiguous.");
@@ -961,7 +982,7 @@ Tensor NestedTensor_softmax_cuda(
   const int64_t num_heads = input.size(1);
   auto cumulative_and_max_q = cumulative_and_max_seq_len2(num_heads, sizes);
   Tensor cumulative_sequence_length_q = std::get<0>(cumulative_and_max_q);
-  std::cout << "cumulative_sequence_length_q: " << cumulative_sequence_length_q << std::endl;
+//  std::cout << "cumulative_sequence_length_q: " << cumulative_sequence_length_q << std::endl;
 
   auto output = input.clone();
   auto output_buffer = get_buffer(output);
@@ -993,8 +1014,8 @@ Tensor NestedTensor_softmax_cuda(
   } else {
     AT_ERROR("Only support fp64/fp32/fp16 for softmax_cuda");
   }
-  std::cout << "input_buffer: " << input_buffer << std::endl;
-  std::cout << "output_buffer: " << output_buffer << std::endl;
+//  std::cout << "input_buffer: " << input_buffer << std::endl;
+//  std::cout << "output_buffer: " << output_buffer << std::endl;
   return output;
 }
 
