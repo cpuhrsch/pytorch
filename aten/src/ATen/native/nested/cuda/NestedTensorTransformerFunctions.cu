@@ -885,13 +885,9 @@ void softmax_kernelLauncher(
   dim3 grid_dim;
   grid_dim.x = batch_size;
   grid_dim.y = num_heads;
-//  std::cout << "batch_size: " << batch_size << std::endl;
-//  std::cout << "num_heads: " << num_heads << std::endl;
   using compute_type = typename ComputeType<T>::type;
-//  std::cout << "Actually launching 00" << std::endl;
   softmax_squares<T, compute_type><<<grid_dim, 256, 0, stream>>>(
       input, output, batch_size, num_heads, sample_size_ptr, seq_lens);
-//  std::cout << "Actually done launching" << std::endl;
 }
 
 std::tuple<Tensor, int64_t> cumulative_and_max_seq_len2(int64_t num_heads,
@@ -947,10 +943,8 @@ Tensor NestedTensor_softmax_cuda(
       return NestedTensor_softmax_generic(input, dim, half_to_float);
     }
   }
-//  std::cout << "LAUNCHING SMALL SQUARES KERNEL" << std::endl;
   auto input_buffer = get_buffer(input);
   auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
-//  std::cout << "sizes_dim2: " << sizes_dim2 << std::endl;
   auto sizes_dim2_cuda = sizes_dim2.contiguous().to(TensorOptions().device(at::kCUDA));
 
   // TORCH_CHECK(input.contiguous(), "Need input to be contiguous.");
@@ -963,7 +957,6 @@ Tensor NestedTensor_softmax_cuda(
   const int64_t num_heads = input.size(1);
   auto cumulative_and_max_q = cumulative_and_max_seq_len2(num_heads, sizes);
   Tensor cumulative_sequence_length_q = std::get<0>(cumulative_and_max_q);
-//  std::cout << "cumulative_sequence_length_q: " << cumulative_sequence_length_q << std::endl;
 
   auto output = input.clone();
   auto output_buffer = get_buffer(output);
@@ -995,8 +988,6 @@ Tensor NestedTensor_softmax_cuda(
   } else {
     AT_ERROR("Only support fp64/fp32/fp16 for softmax_cuda");
   }
-//  std::cout << "input_buffer: " << input_buffer << std::endl;
-//  std::cout << "output_buffer: " << output_buffer << std::endl;
   return output;
 }
 
