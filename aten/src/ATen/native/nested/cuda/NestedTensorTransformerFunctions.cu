@@ -839,35 +839,35 @@ __global__ void softmax_squares(
   // One thread per sequence entry. At most 256 sequence length.
   // If a thread is out of bounds, we don't execute.
 
-  for (int64_t i = 0; i < num_heads; i++) {
-    const T* head_offset = i * seq_len_squared + input_ptr;
-    T* head_offset_out = i * seq_len_squared + output_ptr;
-    for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
-      compute_type thread_val;
-      if (threadIdx.x < seq_len) {
-        // The thread's value.
-        thread_val = head_offset[threadIdx.x + j];
-      } else {
-        thread_val = -std::numeric_limits<compute_type>::max();
-      }
-      // Find the max across the threads and share it.
-      thread_val = blockReduceMax(thread_val);
-      // Now every thread has access to the max.
-      // Subtract the max from the data in shared mem and apply exp
-      compute_type tmp;
-      if (threadIdx.x < seq_len) {
-        tmp = std::exp(head_offset[threadIdx.x + j] - thread_val);
-        thread_val = tmp;
-      } else {
-        thread_val = 0;
-      }
-      // Now we have to sum all of this together
-      thread_val = blockReduceSum(thread_val);
-      // Now we divide the value in shared memory by this sum
-      // and write out the result into shared memory
-      if (threadIdx.x < seq_len) {
-        head_offset_out[threadIdx.x + j] = tmp / thread_val;
-      }
+  int64_t i = blockIdx.y;
+
+  const T* head_offset = i * seq_len_squared + input_ptr;
+  T* head_offset_out = i * seq_len_squared + output_ptr;
+  for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
+    compute_type thread_val;
+    if (threadIdx.x < seq_len) {
+      // The thread's value.
+      thread_val = head_offset[threadIdx.x + j];
+    } else {
+      thread_val = -std::numeric_limits<compute_type>::max();
+    }
+    // Find the max across the threads and share it.
+    thread_val = blockReduceMax(thread_val);
+    // Now every thread has access to the max.
+    // Subtract the max from the data in shared mem and apply exp
+    compute_type tmp;
+    if (threadIdx.x < seq_len) {
+      tmp = std::exp(head_offset[threadIdx.x + j] - thread_val);
+      thread_val = tmp;
+    } else {
+      thread_val = 0;
+    }
+    // Now we have to sum all of this together
+    thread_val = blockReduceSum(thread_val);
+    // Now we divide the value in shared memory by this sum
+    // and write out the result into shared memory
+    if (threadIdx.x < seq_len) {
+      head_offset_out[threadIdx.x + j] = tmp / thread_val;
     }
   }
 }
@@ -884,11 +884,12 @@ void softmax_kernelLauncher(
   // TODO: Optimize settings by getting device properties
   dim3 grid_dim;
   grid_dim.x = batch_size;
+  grid_dim.y = num_heads;
 //  std::cout << "batch_size: " << batch_size << std::endl;
 //  std::cout << "num_heads: " << num_heads << std::endl;
   using compute_type = typename ComputeType<T>::type;
 //  std::cout << "Actually launching 00" << std::endl;
-  softmax_squares<T, compute_type><<<batch_size, 256, 0, stream>>>(
+  softmax_squares<T, compute_type><<<grid_dim, 256, 0, stream>>>(
       input, output, batch_size, num_heads, sample_size_ptr, seq_lens);
 //  std::cout << "Actually done launching" << std::endl;
 }

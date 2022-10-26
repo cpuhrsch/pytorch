@@ -21,7 +21,6 @@ def bench(nt, niter):
 
 
 def sweep_n(num_heads, ntensor, niter, dtype):
-    print("num_heads, dtype, ntensor, runtime, runtime_t, speedup, padding")
     random.seed(123)
     max_sequence_len = 256
     seq_len_list = [max(0, min(max_sequence_len, int(random.gauss(max_sequence_len / 2, 10)))) for _ in range(ntensor)]
@@ -46,5 +45,6 @@ if __name__ == "__main__":
     ntensor = args.ntensor
     num_heads = args.num_heads
 
+    print("num_heads, dtype, ntensor, runtime, runtime_t, speedup, padding")
     sweep_n(num_heads, ntensor, niter, torch.float32)
     sweep_n(num_heads, ntensor, niter, torch.float16)
