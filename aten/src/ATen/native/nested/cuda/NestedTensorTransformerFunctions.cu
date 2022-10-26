@@ -966,7 +966,7 @@ Tensor NestedTensor_softmax_cuda(
       return NestedTensor_softmax_generic(input, dim, half_to_float);
     }
   }
-  std::cout << "LAUNCHING SMALL SQUARES KERNEL" << std::endl;
+//  std::cout << "LAUNCHING SMALL SQUARES KERNEL" << std::endl;
   auto input_buffer = get_buffer(input);
   auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
 //  std::cout << "sizes_dim2: " << sizes_dim2 << std::endl;
