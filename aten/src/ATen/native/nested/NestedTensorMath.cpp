@@ -566,6 +566,18 @@ Tensor NestedTensor_mul_Scalar(const Tensor& self, const Scalar& other) {
   return NestedTensor_mul_Tensor(self, wrapped_scalar_tensor(other));
 }
 
+Tensor NestedTensor_div_Tensor(const Tensor& self, const Tensor& other) {
+  return NestedTensor_elementwise_Tensor(
+      self, other, "div", [](const Tensor& b1, const Tensor& b2) {
+        return at::div(b1, b2);
+      });
+}
+
+// Only usable on the C++ side; scalars are converted to tensors coming from Python.
+Tensor NestedTensor_div_Scalar(const Tensor& self, const Scalar& other) {
+  return NestedTensor_div_Tensor(self, wrapped_scalar_tensor(other));
+}
+
 template <typename Func>
 Tensor& NestedTensor_elementwise__Tensor(
     Tensor& self,
@@ -786,8 +798,7 @@ Tensor NestedTensor_softmax_generic(
   // TODO We would ideally use a empty_like here, but that is not supported
   // for nested tensors yet. Since we are only using the buffer for the options
   // and size it is okay to use unsafe_storage_as_tensor here.
-  const Tensor& buffer = input_ptr->get_unsafe_storage_as_tensor(),
-      & sizemat = input_ptr->get_nested_size_tensor();
+  const Tensor& buffer = input_ptr->get_unsafe_storage_as_tensor();
   Tensor output = input.clone();
   // call tensor softmax
   // TODO: for cpu, maybe use `parallel_for` if benchmarks show necessity

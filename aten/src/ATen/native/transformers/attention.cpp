@@ -703,7 +703,11 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
     auto attn_mask = attn_mask_;
     // Naive, composite implementation defined here.
     const auto embed_size = query_.size(-1);
-    const auto query = query_ * (1. / ::sqrt(static_cast<double>(embed_size)));
+    auto query = query_;
+    if (query.is_nested()) {
+      query = query_.contiguous();
+    }
+    query = query / ::sqrt(static_cast<double>(embed_size));
     if (is_causal) {
         TORCH_CHECK(!attn_mask.has_value(),
                 "_scaled_dot_product_attention: Explicit attn_mask should not be set when is_causal=True");
