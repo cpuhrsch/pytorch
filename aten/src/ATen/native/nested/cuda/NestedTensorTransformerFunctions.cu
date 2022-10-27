@@ -926,6 +926,8 @@ Tensor NestedTensor_softmax_cuda(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
+  // TODO: REMOVE THIS
+  return NestedTensor_softmax_generic(input, dim, half_to_float);
   const auto* query_nt = get_nested_tensor_impl_or_null(input);
   if (!(
         input.dim() == 4 &&
