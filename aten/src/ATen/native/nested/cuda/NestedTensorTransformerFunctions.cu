@@ -843,32 +843,28 @@ __global__ void softmax_squares(
 
   const T* head_offset = i * seq_len_squared + input_ptr;
   T* head_offset_out = i * seq_len_squared + output_ptr;
-  for (int64_t j = 0; j < seq_len_squared; j += seq_len) {
-    compute_type thread_val;
-    if (threadIdx.x < seq_len) {
-      // The thread's value.
-      thread_val = head_offset[threadIdx.x + j];
-    } else {
-      thread_val = -std::numeric_limits<compute_type>::max();
-    }
+
+  compute_type thread_val;
+  compute_type thread_max = -std::numeric_limits<compute_type>::max();
+  compute_type thread_sum = 0;
+
+  int64_t j = blockIdx.z;
+  j = j * seq_len;
+  if (j < seq_len_squared && threadIdx.x < seq_len) {
+    // The thread's value.
+    thread_val = head_offset[threadIdx.x + j];
     // Find the max across the threads and share it.
-    thread_val = blockReduceMax(thread_val);
+    thread_max = thread_val;
+    thread_max = blockReduceMax(thread_max);
     // Now every thread has access to the max.
     // Subtract the max from the data in shared mem and apply exp
-    compute_type tmp;
-    if (threadIdx.x < seq_len) {
-      tmp = std::exp(head_offset[threadIdx.x + j] - thread_val);
-      thread_val = tmp;
-    } else {
-      thread_val = 0;
-    }
+    compute_type tmp = std::exp(thread_val - thread_max);
+    thread_sum = tmp;
     // Now we have to sum all of this together
-    thread_val = blockReduceSum(thread_val);
+    thread_sum = blockReduceSum(thread_sum);
     // Now we divide the value in shared memory by this sum
     // and write out the result into shared memory
-    if (threadIdx.x < seq_len) {
-      head_offset_out[threadIdx.x + j] = tmp / thread_val;
-    }
+    head_offset_out[threadIdx.x + j] = tmp / thread_sum;
   }
 }
 
@@ -885,6 +881,7 @@ void softmax_kernelLauncher(
   dim3 grid_dim;
   grid_dim.x = batch_size;
   grid_dim.y = num_heads;
+  grid_dim.z = 256; // Max seq length
   using compute_type = typename ComputeType<T>::type;
   softmax_squares<T, compute_type><<<grid_dim, 256, 0, stream>>>(
       input, output, batch_size, num_heads, sample_size_ptr, seq_lens);
