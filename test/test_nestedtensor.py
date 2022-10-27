@@ -4,6 +4,8 @@ import unittest
 
 import torch
 import torch.nn
+import unittest
+import numpy as np
 from torch.testing._internal.common_device_type import (
     dtypes,
     dtypesIfCUDA,
@@ -24,6 +26,8 @@ from torch.testing._internal.common_utils import (
 
 # Tests are ported from pytorch/nestedtensor.
 # This makes porting as_nested_tensor easier in the future.
+
+
 def _iter_constructors():
     # yield as_nested_tensor
     yield torch.nested.nested_tensor
@@ -33,6 +37,8 @@ def _iter_constructors():
 # an output nested tensor consists of
 # * `len(ragged_sizes)` matrices
 # * matrices[i].shape == (20, ragged_sizes[i])
+
+
 def random_nt_noncontiguous_pair(ragged_sizes, device="cpu", dtype=torch.float16):
     xs = []
     for size in ragged_sizes:
@@ -49,6 +55,8 @@ def random_nt_noncontiguous_pair(ragged_sizes, device="cpu", dtype=torch.float16
 
 # Helper functions to pad a noncontiguous nested tensor
 # can be replaced once to_padded_tensor supports noncontiguous memory
+
+
 def noncontiguous_to_padded_tensor(input, shape=None):
     tensors = input.unbind()
     ntensors = len(tensors)
@@ -72,6 +80,8 @@ def noncontiguous_to_padded_tensor(input, shape=None):
     return result
 
 # Helper function to generate a random nested tensor
+
+
 def random_nt(device, dtype, num_tensors, max_dims, min_dims=None):
     if min_dims is None:
         min_dims = tuple([0] * len(max_dims))
@@ -82,6 +92,7 @@ def random_nt(device, dtype, num_tensors, max_dims, min_dims=None):
         t1 = torch.randn(tensor_dims, device=device, dtype=dtype)
         ts1.append(t1)
     return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+
 
 class TestNestedTensor(TestCase):
 
@@ -478,7 +489,6 @@ class TestNestedTensorDeviceType(TestCase):
         self.assertEqual(a.grad, torch.ones(2, 4, device=device, dtype=dtype))
         self.assertEqual(b.grad, torch.ones(5, 4, device=device, dtype=dtype))
 
-
     @dtypes(torch.float, torch.float16, torch.double)
     def test_unbind_noncontiguous(self, device, dtype):
         nt_contiguous, nt_noncontiguous = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
@@ -860,6 +870,39 @@ class TestNestedTensorDeviceType(TestCase):
     @dtypes(torch.float, torch.float16)
     @skipMeta
     @torch.inference_mode()
+    def test_nested_tensor_div(self, device, dtype):
+        nt, nt2 = self.random_nt_pair(device, dtype, 4, (4, 4))
+        scale = 4.0
+        ref = torch.nested.nested_tensor([t / scale for t in nt.unbind()])
+        out = nt / 4.0
+        self.assertEqual(ref, out)
+        ref_transposed = ref.transpose(1, 2)
+        out = nt.transpose(1, 2) / 4.0
+        self.assertEqual(ref_transposed, out)
+
+        ref = torch.nested.nested_tensor([t / t2 for (t, t2) in zip(nt.unbind(), nt2.unbind())])
+        out = nt / nt2
+        self.assertEqual(ref, out)
+
+        out = nt.transpose(1, 2) / nt2.transpose(1, 2)
+        self.assertEqual(ref.transpose(1, 2), out)
+
+        nt_transpose_copy = torch.nested.nested_tensor([t.transpose(0, 1) for t in nt.unbind()])
+
+        self.assertRaisesRegex(
+            RuntimeError, "div requires strides to match when given NestedTensors",
+            lambda: nt_transpose_copy.transpose(1, 2) / nt2)
+
+        nt = torch.nested.nested_tensor([torch.randn(i, 4) for i in [3, 4, 5]], device=device, dtype=dtype)
+        nt_chunks = nt.chunk(2, -1)
+        self.assertRaisesRegex(
+            RuntimeError, "div requires offsets to match when given NestedTensors",
+            lambda: nt_chunks[0] / nt_chunks[1])
+
+
+    @dtypes(torch.float, torch.float16)
+    @skipMeta
+    @torch.inference_mode()
     def test_nested_tensor_add_in_place(self, device, dtype):
         (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
         ref = torch.nested.nested_tensor([t1 + t2 for (t1, t2) in zip(nt1.unbind(), nt2.unbind())])
@@ -1198,6 +1241,16 @@ class TestNestedTensorDeviceType(TestCase):
         else:
             self.assertEqual(actual, expect)
 
+        # test tensorcore path
+        nt0 = torch.nested.nested_tensor([torch.randn((2, 8)), torch.randn((3, 16))], device=device, dtype=dtype)
+        nt1 = torch.nested.nested_tensor([torch.randn((8, 8)), torch.randn((16, 8))], device=device, dtype=dtype)
+        actual = torch.nested.to_padded_tensor(nt0.bmm(nt1), 0.0)
+        expect = torch.nested.to_padded_tensor(nt0, 0.0).bmm(torch.nested.to_padded_tensor(nt1, 0.0))
+        if dtype == torch.float16:
+            self.assertEqual(actual, expect, rtol=1e-3, atol=1e-3)
+        else:
+            self.assertEqual(actual, expect)
+
     @onlyCUDA
     @dtypes(torch.float, torch.double, torch.float16)
     def test_bmm_cuda(self, device, dtype):
@@ -1218,6 +1271,40 @@ class TestNestedTensorDeviceType(TestCase):
     #     self.assertEqual(
     #         nt0_contiguous.transpose(-1, -2).bmm(nt1_contiguous),
     #         nt0_noncontiguous.transpose(-1, -2).bmm(nt1_noncontiguous))
+
+    @dtypes(torch.float, torch.double)
+    def test_matmul_with_bmm_path(self, device, dtype):
+        def unbind_rebind_matmul(nt1, nt2):
+            t1s = nt1.unbind()
+            t2s = nt2.unbind()
+            out_ts = [t1.matmul(t2) for t1, t2 in zip(t1s, t2s)]
+            return torch.nested.nested_tensor(out_ts)
+
+        # [N, n_head, *, head_dim], [N, n_head, head_dim, *]
+        N = np.random.randint(2, 5)
+        n_heads = np.random.randint(2, 5)
+        head_dim = 3
+        t1s = []
+        t2s = []
+        for _ in range(N):
+            seq_len1 = np.random.randint(2, 5)
+            seq_len2 = np.random.randint(2, 5)
+            t1s.append(torch.randn(n_heads, seq_len1, head_dim))
+            t2s.append(torch.randn(n_heads, head_dim, seq_len2))
+        nt1 = torch.nested.nested_tensor(t1s, device=device, dtype=dtype)
+        nt2 = torch.nested.nested_tensor(t2s, device=device, dtype=dtype)
+        self.assertEqual(torch._matmul_with_bmm_nested(nt1, nt2), unbind_rebind_matmul(nt1, nt2))
+
+        # test with noncontiguous
+        t3s = []
+        t4s = []
+        for _ in range(N):
+            seq_len = np.random.randint(2, 5)
+            t3s.append(torch.randn(seq_len, n_heads, head_dim))
+            t4s.append(torch.randn(seq_len, n_heads, head_dim))
+        nt3 = torch.nested.nested_tensor(t3s, device=device, dtype=dtype).transpose(1, 2)
+        nt4 = torch.nested.nested_tensor(t4s, device=device, dtype=dtype).transpose(1, 2).transpose(2, 3)
+        self.assertEqual(torch._matmul_with_bmm_nested(nt3, nt4), unbind_rebind_matmul(nt3, nt4))
 
     # cannot test torch.float16 because: RuntimeError: "bmm" not implemented for 'Half'
     @dtypes(torch.float, torch.double)
@@ -1747,7 +1834,6 @@ class TestNestedTensorAutograd(TestCase):
         return torch.nested.as_nested_tensor([torch.randn(1, 2, requires_grad=requires_grad),
                                               torch.randn(7, 8, requires_grad=requires_grad)])
 
-
     def _create_nested_tensor_from_mask(self, requires_grad=False):
         data = torch.randn(2, 3, 4, requires_grad=requires_grad)
         mask = torch.ones_like(data[:, :, 0]).bool()
@@ -1786,7 +1872,6 @@ class TestNestedTensorAutograd(TestCase):
         self.assertEqual(nt2.grad, fake_grad)
         self.assertEqual(a.grad, None)
         self.assertEqual(b.grad, None)
-
 
     def test_set_requires_grad_from_list(self):
         nt = self._create_nested_tensor_from_list()
@@ -2153,6 +2238,7 @@ class TestNestedTensorAutograd(TestCase):
         nt[0].backward(grad_x0)
         expected_grad = torch.nested.nested_tensor([grad_x0, torch.zeros((3, 4))])
         self.assertEqual(nt.grad, expected_grad)
+
 
 instantiate_device_type_tests(TestNestedTensorDeviceType, globals())
 
