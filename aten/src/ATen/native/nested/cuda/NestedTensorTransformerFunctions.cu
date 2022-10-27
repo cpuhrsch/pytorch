@@ -831,32 +831,30 @@ __global__ void softmax_squares(
     const int32_t* batch_offsets,
     const int64_t* seq_lens) {
   const int64_t seq_len = seq_lens[blockIdx.x];
-  int64_t j = blockIdx.z;
+  const int64_t head_id = blockIdx.y;
+  const int64_t rowId = blockIdx.z;
+  const int64_t idx = threadIdx.x;
+  const int32_t batch_offset = batch_offsets[blockIdx.x];
+
 
   compute_type thread_val;
   compute_type thread_max = -std::numeric_limits<compute_type>::max();
   compute_type thread_sum = 0;
 
   const int64_t seq_len_squared = seq_len * seq_len;
-  if (j < seq_len && threadIdx.x < seq_len) {
-    j = j * seq_len;
-    int64_t idx = threadIdx.x + j;
-    int32_t batch_offset = batch_offsets[blockIdx.x];
-    const T* input_ptr = input + batch_offset;
-    T* output_ptr = output + batch_offset;
+  if (rowId < seq_len && idx < seq_len) {
     // Size of entire square matrix
     // One thread per sequence entry. At most 256 sequence length.
     // If a thread is out of bounds, we don't execute.
 
-    int64_t i = blockIdx.y;
 
-    const T* head_offset = i * seq_len_squared + input_ptr;
-    T* head_offset_out = i * seq_len_squared + output_ptr;
+    const T* head_offset = head_id * seq_len_squared + input + batch_offset;
+    T* head_offset_out = head_id * seq_len_squared + output + batch_offset;
 
 
 
     // The thread's value.
-    thread_val = head_offset[idx];
+    thread_val = head_offset[idx + rowId * seq_len];
     // Find the max across the threads and share it.
     thread_max = thread_val;
     thread_max = blockReduceMax(thread_max);
@@ -868,7 +866,7 @@ __global__ void softmax_squares(
     thread_sum = blockReduceSum(thread_sum);
     // Now we divide the value in shared memory by this sum
     // and write out the result into shared memory
-    head_offset_out[idx] = tmp / thread_sum;
+    head_offset_out[idx + rowId * seq_len] = tmp / thread_sum;
   }
 }
 
@@ -926,8 +924,6 @@ Tensor NestedTensor_softmax_cuda(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
-  // TODO: REMOVE THIS
-  return NestedTensor_softmax_generic(input, dim, half_to_float);
   const auto* query_nt = get_nested_tensor_impl_or_null(input);
   if (!(
         input.dim() == 4 &&

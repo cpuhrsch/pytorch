@@ -1088,7 +1088,9 @@ class TestNestedTensorDeviceType(TestCase):
     def test_softmax_transformer_kernel(self, device, dtype):
         if device == "cpu" and dtype == torch.half:
             return
-        seq_lens = [2, 3, 10,  15, 6]
+        # seq_lens = [128, 33, 251, 15, 6, 32]
+        seq_lens = [28, 33, 32, 15, 6, 32]
+        # seq_lens = 8*seq_lens
         num_heads = 8
         tensors = [torch.randn(num_heads, i, i, dtype=dtype, device=device) for i in seq_lens]
         nt = torch.nested.nested_tensor(tensors, dtype=dtype, device=device)
