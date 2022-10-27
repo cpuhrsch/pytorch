@@ -831,14 +831,16 @@ __global__ void softmax_squares(
     const int32_t* batch_offsets,
     const int64_t* seq_lens) {
   const int64_t seq_len = seq_lens[blockIdx.x];
-  int64_t j = blockIdx.z * seq_len;
+  int64_t j = blockIdx.z;
 
   compute_type thread_val;
   compute_type thread_max = -std::numeric_limits<compute_type>::max();
   compute_type thread_sum = 0;
 
   const int64_t seq_len_squared = seq_len * seq_len;
-  if (j < seq_len_squared && threadIdx.x < seq_len) {
+  if (j < seq_len && threadIdx.x < seq_len) {
+    j = j * seq_len;
+    int64_t idx = threadIdx.x + j;
     int32_t batch_offset = batch_offsets[blockIdx.x];
     const T* input_ptr = input + batch_offset;
     T* output_ptr = output + batch_offset;
@@ -852,8 +854,9 @@ __global__ void softmax_squares(
     T* head_offset_out = i * seq_len_squared + output_ptr;
 
 
+
     // The thread's value.
-    thread_val = head_offset[threadIdx.x + j];
+    thread_val = head_offset[idx];
     // Find the max across the threads and share it.
     thread_max = thread_val;
     thread_max = blockReduceMax(thread_max);
@@ -865,7 +868,7 @@ __global__ void softmax_squares(
     thread_sum = blockReduceSum(thread_sum);
     // Now we divide the value in shared memory by this sum
     // and write out the result into shared memory
-    head_offset_out[threadIdx.x + j] = tmp / thread_sum;
+    head_offset_out[idx] = tmp / thread_sum;
   }
 }
 

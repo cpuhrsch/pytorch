@@ -1095,7 +1095,6 @@ class TestNestedTensorDeviceType(TestCase):
         nt_result = nt.softmax(-1)
         for i, (t, nt_ref) in enumerate(zip(tensors, nt_result.unbind())):
             t = t.softmax(-1)
-            # print("i: ", i, " nt_ref: ", nt_ref, " t: ", t)
             self.assertEqual(t, nt_ref)
 
     @dtypes(torch.float, torch.double)
