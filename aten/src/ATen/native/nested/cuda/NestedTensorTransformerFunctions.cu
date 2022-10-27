@@ -830,27 +830,28 @@ __global__ void softmax_squares(
     const int64_t num_heads,
     const int32_t* batch_offsets,
     const int64_t* seq_lens) {
-  int32_t batch_offset = batch_offsets[blockIdx.x];
-  const T* input_ptr = input + batch_offset;
-  T* output_ptr = output + batch_offset;
   const int64_t seq_len = seq_lens[blockIdx.x];
-  // Size of entire square matrix
-  const int64_t seq_len_squared = seq_len * seq_len;
-  // One thread per sequence entry. At most 256 sequence length.
-  // If a thread is out of bounds, we don't execute.
-
-  int64_t i = blockIdx.y;
-
-  const T* head_offset = i * seq_len_squared + input_ptr;
-  T* head_offset_out = i * seq_len_squared + output_ptr;
+  int64_t j = blockIdx.z * seq_len;
 
   compute_type thread_val;
   compute_type thread_max = -std::numeric_limits<compute_type>::max();
   compute_type thread_sum = 0;
 
-  int64_t j = blockIdx.z;
-  j = j * seq_len;
+  const int64_t seq_len_squared = seq_len * seq_len;
   if (j < seq_len_squared && threadIdx.x < seq_len) {
+    int32_t batch_offset = batch_offsets[blockIdx.x];
+    const T* input_ptr = input + batch_offset;
+    T* output_ptr = output + batch_offset;
+    // Size of entire square matrix
+    // One thread per sequence entry. At most 256 sequence length.
+    // If a thread is out of bounds, we don't execute.
+
+    int64_t i = blockIdx.y;
+
+    const T* head_offset = i * seq_len_squared + input_ptr;
+    T* head_offset_out = i * seq_len_squared + output_ptr;
+
+
     // The thread's value.
     thread_val = head_offset[threadIdx.x + j];
     // Find the max across the threads and share it.
