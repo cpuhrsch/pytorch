@@ -1127,6 +1127,19 @@ class TestNestedTensorDeviceType(TestCase):
         self.assertRaises(RuntimeError, lambda: torch.nn.functional.softmax(nt1, 0))
         self.assertRaises(IndexError, lambda: torch.nn.functional.softmax(nt1, 1))
 
+    @dtypes(torch.half, torch.float, torch.double)
+    def test_softmax_transformer_kernel(self, device, dtype):
+        if device == "cpu" and dtype == torch.half:
+            return
+        seq_lens = [2, 3, 10,  15, 6]
+        num_heads = 8
+        tensors = [torch.randn(num_heads, i, i, dtype=dtype, device=device) for i in seq_lens]
+        nt = torch.nested.nested_tensor(tensors, dtype=dtype, device=device)
+        nt_result = nt.softmax(-1)
+        for i, (t, nt_ref) in enumerate(zip(tensors, nt_result.unbind())):
+            t = t.softmax(-1)
+            self.assertEqual(t, nt_ref)
+
     @dtypes(torch.float, torch.double)
     @torch.inference_mode()
     def test_softmax_noncontiguous(self, device, dtype):

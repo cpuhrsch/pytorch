@@ -4833,7 +4833,8 @@
   structured_delegate: _softmax.out
   dispatch:
     MkldnnCPU: mkldnn_softmax
-    NestedTensorCPU, NestedTensorCUDA: softmax_nested
+    NestedTensorCPU: NestedTensor_softmax_generic
+    NestedTensorCUDA: NestedTensor_softmax_cuda
   tags: canonical
 
 - func: _softmax.out(Tensor self, int dim, bool half_to_float, *, Tensor(a!) out) -> Tensor(a!)

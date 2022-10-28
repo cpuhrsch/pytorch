@@ -11,5 +11,10 @@ TORCH_API Tensor NestedTensor_to_padded_tensor_generic(
     double padding,
     OptionalIntArrayRef output_size);
 
+TORCH_API Tensor NestedTensor_softmax_generic(
+    const Tensor& input,
+    const int64_t dim,
+    const bool half_to_float);
+
 } // namespace native
 } // namespace at

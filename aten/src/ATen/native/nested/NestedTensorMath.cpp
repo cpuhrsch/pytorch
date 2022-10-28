@@ -795,7 +795,7 @@ std::tuple<Tensor,Tensor> native_dropout_nested(const Tensor& input, double p, c
   return std::make_tuple(output, mask);
 }
 
-Tensor softmax_nested(
+Tensor NestedTensor_softmax_generic(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
@@ -814,8 +814,7 @@ Tensor softmax_nested(
   // and size it is okay to use unsafe_storage_as_tensor here.
   const Tensor& buffer = input_ptr->get_unsafe_storage_as_tensor(),
       & sizemat = input_ptr->get_nested_size_tensor();
-  Tensor output_buffer = buffer.new_empty(buffer.sizes());
-  Tensor output = wrap_buffer(output_buffer, sizemat.clone());
+  Tensor output = input.clone();
   // call tensor softmax
   // TODO: for cpu, maybe use `parallel_for` if benchmarks show necessity
   //       to do that, have to merge `aten/src/ATen/native/cpu/SoftMaxKernel.cpp/softmax_kernel`
