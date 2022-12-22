@@ -383,7 +383,7 @@ struct SparseTestbed {
     }
       std::cout << "VERY SUFFICIENT" << std::endl;
 
-//    this->initialize(problem_size);
+    this->initialize(problem_size);
 
     //
     // Initialize the GEMM operator
@@ -420,7 +420,7 @@ struct SparseTestbed {
       // tensor_D.device_ref(),
       tensor_d_device_ref,
 
-//      tensor_E_reordered.device_ref(),
+      tensor_E_reordered.device_ref(),
       {alpha, beta},
       split_k_slices
     };
@@ -470,8 +470,13 @@ struct SparseTestbed {
 //    //
 //
 //    cudaDeviceSynchronize();
-    // tensor_D.sync_host();
-    // std::cout << "\nComputed =\n" << tensor_D.host_view();
+     tensor_D.sync_host();
+     auto tdhv = tensor_D.host_view();
+     std::cout << "tdhv.size(): " << tdhv.size() << std::endl;
+     std::cout << "tdhv.capacity(): " << tdhv.capacity() << std::endl;
+     std::cout << "tdhv.stride(0): " << tdhv.stride(0) << std::endl;
+     std::cout << "tdhv.stride(1): " << tdhv.stride(1) << std::endl;
+     std::cout << "\nComputed =\n" << tdhv << std::endl;
 //
 //    bool passed = this->verify(problem_size, alpha, beta);
 
@@ -736,7 +741,7 @@ namespace native {
 
 // TODO: Pull back in device and cuda version constraints.
 Tensor _cusparselt_linear(const Tensor& sparse, const Tensor& dense) {
-  auto result = sparse.new_empty({sparse.size(0), dense.size(1)}); //.fill_(1);
+  auto result = sparse.new_empty({sparse.size(0), dense.size(1)}).fill_(99);
 //  auto init = sparse.new_empty({sparse.size(0), dense.size(1)}).fill_(2);
   auto stream = at::cuda::getDefaultCUDAStream();
   // at::cuda::stream_synchronize(stream);
