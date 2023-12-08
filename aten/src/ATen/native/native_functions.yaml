@@ -3314,6 +3314,10 @@
   dispatch:
     CUDA: _mixed_dtypes_linear
 
+- func: _i8i8bf16_cutlass(Tensor input, Tensor weight, double scale, int split_k=1) -> Tensor
+  dispatch:
+    CUDA: _i8i8bf16_cutlass
+
 - func: fbgemm_linear_int8_weight_fp32_activation(Tensor input, Tensor weight, Tensor packed, Tensor col_offsets, Scalar weight_scale, Scalar weight_zero_point, Tensor bias) -> Tensor
 
 - func: fbgemm_linear_int8_weight(Tensor input, Tensor weight, Tensor packed, Tensor col_offsets, Scalar weight_scale, Scalar weight_zero_point, Tensor bias) -> Tensor
