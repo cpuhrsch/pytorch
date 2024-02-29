@@ -129,22 +129,69 @@ mm_kernel_configs = [
     {"config": (32, 32, 16, 1, 2), "cond": True},
 ]
 
-int8_mm_kernel_configs = [
-    {"config": (64, 64, 32, 2, 4), "cond": True},
-    {"config": (64, 128, 32, 3, 4), "cond": True},
-    {"config": (128, 64, 32, 3, 4), "cond": True},
-    {"config": (64, 128, 32, 4, 8), "cond": True},
-    {"config": (128, 64, 32, 4, 8), "cond": True},
-    {"config": (64, 32, 32, 5, 8), "cond": True},
-    {"config": (32, 64, 32, 5, 8), "cond": True},
-    {"config": (128, 128, 32, 2, 8), "cond": True},
-    {"config": (64, 64, 64, 3, 8), "cond": True},
-    # {"config": (32, 32, 128, 2, 4), "cond": True},
-    # {"config": (64, 64, 16, 2, 4), "cond": True},
-    # {"config": (32, 32, 16, 1, 2), "cond": True},
-    {"config": (128, 256, 128, 3, 8), "cond": torch.version.hip is None},
-    {"config": (256, 128, 128, 3, 8), "cond": torch.version.hip is None},
-]
+import itertools
+int8_powers_of_two = [32, 64, 128, 256]
+int8_mm_kernel_configs = sum([
+    # "BLOCK_M", "BLOCK_N", "BLOCK_K", "num_stages", "num_warps"
+        [
+            {"config": (i, j, k, 1, 1), "cond": True},
+
+            {"config": (i, j, k, 1, 2), "cond": True},
+            {"config": (i, j, k, 2, 2), "cond": True},
+
+            {"config": (i, j, k, 1, 4), "cond": True},
+            {"config": (i, j, k, 2, 4), "cond": True},
+            {"config": (i, j, k, 3, 4), "cond": True},
+            {"config": (i, j, k, 4, 4), "cond": True},
+
+            {"config": (i, j, k, 1, 8), "cond": True},
+            {"config": (i, j, k, 2, 8), "cond": True},
+            {"config": (i, j, k, 3, 8), "cond": True},
+            {"config": (i, j, k, 4, 8), "cond": True},
+            {"config": (i, j, k, 5, 8), "cond": True},
+            {"config": (i, j, k, 6, 8), "cond": True},
+            {"config": (i, j, k, 7, 8), "cond": True},
+            {"config": (i, j, k, 8, 8), "cond": True},
+        ] for 
+        (i, j, k) in 
+        itertools.product(int8_powers_of_two,
+                          int8_powers_of_two,
+                          int8_powers_of_two)], [])
+
+# print("\n".join(map(str, int8_mm_kernel_configs)))
+# print(f"len int8 configs: {len(int8_mm_kernel_configs)}")
+
+# int8_mm_kernel_configs = [
+#     # "BLOCK_M", "BLOCK_N", "BLOCK_K", "num_stages", "num_warps"
+#     {"config": (32, 32, 32, 1, 2), "cond": True},
+#     {"config": (32, 32, 32, 2, 4), "cond": True},
+#     {"config": (32, 32, 32, 4, 8), "cond": True},
+# 
+#     {"config": (32, 32, 128, 1, 2), "cond": True},
+#     {"config": (32, 32, 128, 2, 4), "cond": True},
+#     {"config": (32, 32, 128, 4, 8), "cond": True},
+# 
+#     {"config": (32, 64, 32, 5, 8), "cond": True},
+# 
+#     {"config": (64, 32, 32, 5, 8), "cond": True},
+# 
+#     {"config": (64, 64, 32, 2, 4), "cond": True},
+#     {"config": (64, 64, 32, 3, 4), "cond": True},
+#     {"config": (64, 64, 64, 3, 8), "cond": True},
+# 
+#     {"config": (64, 128, 32, 2, 4), "cond": True},
+#     {"config": (64, 128, 32, 3, 4), "cond": True},
+#     {"config": (64, 128, 32, 4, 8), "cond": True},
+# 
+#     {"config": (128, 64, 32, 2, 4), "cond": True},
+#     {"config": (128, 64, 32, 3, 4), "cond": True},
+#     {"config": (128, 64, 32, 4, 8), "cond": True},
+# 
+#     {"config": (128, 128, 32, 2, 8), "cond": True},
+# 
+#     {"config": (128, 256, 128, 3, 8), "cond": True},
+#     {"config": (256, 128, 128, 3, 8), "cond": True},
+# ]
 
 # Create filtered list of configs based on cond evaluation
 
@@ -179,6 +226,7 @@ mm_configs = functools.partial(
 int8_mm_configs = functools.partial(
     filtered_configs,
     configs=int8_platform_configs,
+    # has_int8_tensor=True,
 )
 
 

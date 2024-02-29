@@ -1,3 +1,4 @@
+import triton
 import builtins
 import functools
 import inspect
@@ -932,6 +933,11 @@ class AlgorithmSelectorCache(PersistentCache):
                         "CUDA compilation error: \n%s. \nIgnore this choice.", str(e)
                     )
                     timing = float("inf")
+                except triton.runtime.OutOfResources as e:
+                    log.warning(
+                        "OutOfResources error: \n%s. \nIgnore this choice.", str(e)
+                    )
+                    timing = float("inf")
                 except RuntimeError as e:
                     msg = str(e)
                     if "invalid argument" in msg:
@@ -947,6 +953,7 @@ class AlgorithmSelectorCache(PersistentCache):
                         f"Incorrect result from choice {choice}\n\n{e}"
                     )
 
+                # print(f"{timing} - {choice}")
                 timings[choice] = timing
 
             return timings
