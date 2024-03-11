@@ -8,6 +8,7 @@
 #include <c10/util/irange.h>
 
 #include <climits>
+#include <iostream>
 
 #if AT_BUILD_WITH_BLAS()
 #if C10_IOS
@@ -306,6 +307,8 @@ void gemm(
       int c_size = n_ * ldc_;
       // C matrix in OpenBLAS sbgemm are of type "float" so we have to convert, copy and copy back.
       std::vector<float> float_v(c, c + c_size);
+      std::cout << "HERE1" << std::endl;
+      TORCH_CHECK(false, "Here1");
       sbgemm_(&transa_, &transb_,
               &m_, &n_, &k_,
               &alpha_,
@@ -395,6 +398,8 @@ void gemm(
     int c_size = n_ * ldc;
     std::vector<float> float_c(c, c + c_size);
     #if C10_IOS
+      std::cout << "HERE21" << std::endl;
+    // TORCH_CHECK(false, "Here21");
     CBLAS_TRANSPOSE transa_ = to_apple_accelerate_transpose(transa);
     CBLAS_TRANSPOSE transb_ = to_apple_accelerate_transpose(transb);
     cblas_sgemm(CblasColMajor,
@@ -406,6 +411,8 @@ void gemm(
       beta_,
       float_c.data(), ldc_);
     #else
+      std::cout << "HERE22" << std::endl;
+    // TORCH_CHECK(false, "Here22");
     char transa_ = to_blas(transa), transb_ = to_blas(transb);
     sgemm_(
         &transa_, &transb_,
@@ -462,6 +469,8 @@ void gemm(
 
 #if AT_BUILD_WITH_BLAS()
   if (use_blas_gemm(transa, transb, m, n, k, lda, ldb, ldc)) {
+    std::cout << "HERE3" << std::endl;
+    TORCH_CHECK(false, "Here3");
     int m_ = m, n_ = n, k_ = k, lda_ = lda, ldb_ = ldb, ldc_ = ldc;
     float alpha_ = alpha, beta_ = beta;
     int a_size = (transa != TransposeType::NoTranspose?m_:k_) * lda;
@@ -520,6 +529,8 @@ void gemm(
 
 #if AT_BUILD_WITH_BLAS()
   if (use_blas_gemm(transa, transb, m, n, k, lda, ldb, ldc)) {
+    std::cout << "HERE4" << std::endl;
+    TORCH_CHECK(false, "Here4");
     int m_ = m, n_ = n, k_ = k, lda_ = lda, ldb_ = ldb, ldc_ = ldc;
     float alpha_ = alpha, beta_ = beta;
     int a_size = (transa != TransposeType::NoTranspose?m_:k_) * lda;

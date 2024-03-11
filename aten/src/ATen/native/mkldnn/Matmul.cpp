@@ -121,6 +121,7 @@ mkldnn_gemm(
   bool bf32_usable = std::is_same_v<scalar_t, float> && use_mkldnn_bf32_matmul();
   if ( !(bf16_usable || fp16_usable || bf32_usable) ||
       (m * n * k <= 16 * 16 * 16) || (alpha == 0.0f)) {
+    std::cout << "MKLDNN DIDNT APPLY DUE TO SHAPES! " << " m is " << m << " n is " << n << " k is " << k << " alpha is " << alpha << std::endl;
     return false;
   }
 
@@ -323,15 +324,19 @@ inline bool checksize(const Tensor& mat1, const Tensor& mat2){
   static const int64_t mkldnn_gemm_min_size = 16 * 16 * 16;
   if (mat1.dim() == 1 && mat2.dim() == 1) {
     // aten::dot
+    std::cout << "Fail here1" << std::endl;
     return mat1.size(0) > mkldnn_gemm_min_size;
   } else if (mat1.dim() == 2 && mat2.dim() == 1) {
     // aten::mv
+    std::cout << "Fail here2" << std::endl;
     return mat1.size(0) * mat1.size(1) > mkldnn_gemm_min_size;
   } else if (mat2.dim() == 2 && mat2.dim() == 2) {
     // aten::addmm
+    std::cout << "Fail here3" << std::endl;
     return mat1.size(0) * mat1.size(1) * mat2.size(1) > mkldnn_gemm_min_size;
   } else {
     // aten::bmm, aten::baddbmm
+    std::cout << "Fail here4" << std::endl;
     return mat1.size(0) * mat1.size(1) * mat1.size(2) * mat2.size(2) > mkldnn_gemm_min_size;
   }
 }
