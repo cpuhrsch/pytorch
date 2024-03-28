@@ -504,6 +504,19 @@ def prod_dim_int(func, *args, **kwargs):
 
     return NestedTensor(func(inp._values, **new_kwargs), **extract_kwargs(args[0]))
 
+@register_jagged_func(
+    torch.ops.aten.split.Tensor, "self: jt, split_size: any"
+)
+def split_tensor(func, *args, **kwargs):
+    _, new_kwargs = normalize_function(
+        func, args=args, kwargs=kwargs, normalize_to_only_use_kwargs=True
+    )
+
+    split_size = new_kwargs.pop("split_size")
+    assert split_size == 1
+    inp = new_kwargs.pop("input")
+    return tuple(inp._values[i:j] for (i, j) in zip(inp._offsets[:-1], inp._offsets[1:]))
+
 
 @register_jagged_func(
     torch.ops.aten.split.Tensor, "self: jt, split_size: any, dim: any"
